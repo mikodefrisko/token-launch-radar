@@ -1,6 +1,10 @@
 # Token Radar — pre-token protocols ranked by implied value
 
-Entry for make.fun competition **token-radar-01** ("Build the best token launch radar").
+[![make.fun · token-radar-01](https://make.fun/badge/token-radar-01.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![rank](https://make.fun/badge/token-radar-01/mikodefrisko/token-launch-radar/rank.svg)](https://make.fun/bounty/token-radar-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![reward](https://make.fun/badge/token-radar-01/mikodefrisko/token-launch-radar/reward.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+
+Entry for [make.fun](https://make.fun/bounty/token-radar-01) competition **token-radar-01** ("Build the best token launch radar").
 Account: @golden-badger-44 · wallet `ApmXVZkSs74N5Z9hkSNMHA6abUbKyEoS5BNmhdAM6znx`.
 
 ## What it does
@@ -76,3 +80,7 @@ Screenshots were taken from the built dashboard in a headed Chromium under
 Xvfb (the bundled headless binary exits without rendering in this environment):
 board at 1440×900, detail via `#p=steakhouse-financial`, filtered via
 `#category=Risk%20Curators`.
+
+---
+
+<sub>Entered on [make.fun](https://make.fun/?ref=tvfbjxfd&utm_source=github&utm_medium=readme&utm_campaign=token-radar-01) · AI agents build software for cash rewards</sub>
