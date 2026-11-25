@@ -7,7 +7,7 @@
   var DATA = window.RADAR;
   if (!DATA) return;
   var app = document.getElementById('board');
-  var state = { q: '', category: 'all', chain: 'all', watchlistOnly: false, tab: 'pre-token', sort: 'implied', dir: -1, selected: null };
+  var state = { q: '', category: 'all', chain: 'all', watchlistOnly: false, tab: 'pre-token', sort: 'implied', dir: -1, selected: null, coverageReason: 'all' };
 
   var usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
   function fmtUsd(n) {
@@ -127,17 +127,34 @@
     if (s.length < 20) s = s + " Hold the position and check the protocol's own page.";
     return s;
   }
+  function fmtMoney(n) {
+    if (Math.round(n) === n) return '$' + n;
+    return '$' + n.toFixed(2);
+  }
+  // Gas follows the protocol's first chain, the same tiers main.ts uses: Ethereum mainnet
+  // $5-$30 a transaction, cheap L2s and low-fee L1s about $0.50-$1, other chains about $2-$3.
+  var CHEAP_CHAINS = ['Arbitrum', 'Optimism', 'Base', 'Polygon', 'zkSync Era', 'Linea', 'Scroll', 'Blast', 'Mode', 'Unichain', 'Ink', 'Katana', 'Corn', 'Mantle', 'Metis', 'Gnosis', 'Avalanche', 'BSC', 'Binance', 'Solana', 'Sui', 'Aptos', 'Near', 'Fantom', 'Celo', 'Kava', 'Sei', 'Starknet', 'Zora', 'Fraxtal'];
+  function gasTier(p) {
+    var chain = chainOf(p);
+    if (chain === 'Ethereum') return { tier: 'Ethereum mainnet', fund: 10, setup: 15, weekly: 6, claim: 10 };
+    if (CHEAP_CHAINS.indexOf(chain) >= 0) return { tier: 'cheap L2 / low-fee chain', fund: 0.5, setup: 1, weekly: 0.5, claim: 1 };
+    return { tier: 'mid-fee chain', fund: 2, setup: 3, weekly: 2, claim: 3 };
+  }
   function farmSteps(p) {
     var chain = chainOf(p);
     var capital = capitalFor(p);
     var hold = holdDaysFor(p.age_days);
+    var gas = gasTier(p);
+    var weeklyTotal = Math.round(gas.weekly * 4 * 100) / 100;
+    var totalGas = Math.round((gas.fund + gas.setup + weeklyTotal + gas.claim) * 100) / 100;
+    var ratePerHour = (totalGas * 60) / 80;
     return [
-      { text: 'Use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.', cost: 'under $3 of gas for the first transaction', time: '5 minutes' },
-      { text: actionFor(p, capital, chain), cost: '$' + capital + ' of capital and about $' + (capital >= 150 ? 8 : 4) + ' of gas', time: '15 minutes to set up' },
-      { text: weeklyActionFor(p, capital, chain), cost: 'about $2 of gas a week', time: '10 minutes a week' },
-      { text: 'Hold the position for at least ' + hold + ' days so the activity is counted in more than one snapshot.', cost: 'the $' + capital + ' stays in the position', time: hold + ' days' },
-      { text: "Before you withdraw, open the protocol's own points or rewards page and claim only from the link it publishes.", cost: 'no fee to check, and never pay to claim', time: '10 minutes' },
-      { text: 'Write the wallet, the dates and every transaction in a farm log so you can repeat the position or unwind it.', cost: 'nothing but the log', time: '5 minutes' }
+      { text: 'Use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.', cost: fmtMoney(gas.fund) + ' of gas to fund it on ' + chain, time: '10 minutes' },
+      { text: actionFor(p, capital, chain), cost: fmtMoney(capital) + ' of capital and ' + fmtMoney(gas.setup) + ' of gas', time: '15 minutes to set up' },
+      { text: weeklyActionFor(p, capital, chain), cost: fmtMoney(gas.weekly) + ' of gas a week, ' + fmtMoney(weeklyTotal) + ' over 4 weeks', time: '10 minutes a week, 40 minutes over 4 weeks' },
+      { text: 'Hold the position for at least ' + hold + ' days so the activity is counted in more than one snapshot.', cost: 'the ' + fmtMoney(capital) + ' stays in the position', time: hold + ' days' },
+      { text: "Before you withdraw, open the protocol's own points or rewards page and claim only from the link it publishes.", cost: fmtMoney(gas.claim) + ' of gas to claim', time: '10 minutes' },
+      { text: 'Write the wallet, the dates and every transaction in a farm log so you can repeat the position or unwind it. Total gas ' + fmtMoney(totalGas) + ' over 80 active minutes is about $' + ratePerHour.toFixed(2) + ' an hour of active work on ' + gas.tier + ', with ' + fmtMoney(capital) + ' minimum capital locked for ' + hold + ' days. That is a cost rate, not earnings: no token is promised.', cost: 'nothing but the log', time: '5 minutes' }
     ].map(stepText);
   }
 
@@ -182,6 +199,8 @@
       else if (key === 'tvl') { av = a.tvl_usd; bv = b.tvl_usd; }
       else if (key === 'growth') { av = a.change_7d === null ? -Infinity : a.change_7d; bv = b.change_7d === null ? -Infinity : b.change_7d; }
       else if (key === 'age') { av = a.age_days === null ? Infinity : a.age_days; bv = b.age_days === null ? Infinity : b.age_days; }
+      else if (key === 'expected') { av = a.expected_value_usd; bv = b.expected_value_usd; }
+      else if (key === 'prob') { av = a.issuance_probability; bv = b.issuance_probability; }
       else { av = a.implied_value_usd; bv = b.implied_value_usd; }
       if (av < bv) return -state.dir;
       if (av > bv) return state.dir;
@@ -201,15 +220,16 @@
   }
 
   function lede() {
+    var cov = DATA.coverage || { accounted_for: 0, total: 0 };
     return el('section', { class: 'lede' },
       el('div', null,
         el('h1', { text: DATA.watchlist_size + ' watchlist protocols, ranked by implied value' }),
-        el('p', { text: 'The watchlist is the floor: every protocol with at least $' + Math.round(DATA.floor_usd / 1e6) + 'M of TVL and no token on record. The early radar adds ' + DATA.early_size + ' pre-token protocols below that floor. Implied value is a model, not a promise.' })
+        el('p', { text: 'The watchlist is the floor: every protocol with at least $' + Math.round(DATA.floor_usd / 1e6) + 'M of TVL and no token on record. The early radar adds ' + DATA.early_size + ' pre-token protocols below that floor and above it. Each row shows a value range, not a single number, and an expected value — implied value times the token-record share of its age and TVL cohort. Implied value is a model, not a promise.' })
       ),
       el('div', { class: 'facts' },
         el('div', { class: 'fact' }, el('span', { text: 'Watchlist covered' }), el('b', { text: DATA.watchlist_size + ' / ' + DATA.watchlist_size })),
         el('div', { class: 'fact' }, el('span', { text: 'Pre-token rows scored' }), el('b', { text: String(DATA.board_size) })),
-        el('div', { class: 'fact' }, el('span', { text: 'Early rows below the floor' }), el('b', { text: String(DATA.early_size) })),
+        el('div', { class: 'fact' }, el('span', { text: 'Protocols accounted for' }), el('b', { text: cov.accounted_for + ' / ' + cov.total })),
         el('div', { class: 'fact' }, el('span', { text: 'Live-token protocols set aside' }), el('b', { text: String(DATA.live_size) }))
       )
     );
@@ -256,13 +276,14 @@
     var watchToggle = el('button', { type: 'button', class: 'toggle', 'aria-pressed': state.watchlistOnly ? 'true' : 'false', text: state.watchlistOnly ? 'Watchlist only: on' : 'Watchlist only: off', onclick: function () { state.watchlistOnly = !state.watchlistOnly; writeHash(); render(); } });
     var pre = el('button', { type: 'button', 'aria-pressed': state.tab === 'pre-token' ? 'true' : 'false', text: 'Pre-token', onclick: function () { state.tab = 'pre-token'; render(); } });
     var live = el('button', { type: 'button', 'aria-pressed': state.tab === 'live' ? 'true' : 'false', text: 'Live token', onclick: function () { state.tab = 'live'; render(); } });
+    var cov = el('button', { type: 'button', 'aria-pressed': state.tab === 'coverage' ? 'true' : 'false', text: 'Coverage', onclick: function () { state.tab = 'coverage'; render(); } });
     return el('div', { class: 'controls' },
       el('div', { class: 'field' }, el('label', { for: 'q', text: 'Search' }), search),
       el('div', { class: 'field' }, el('label', { for: 'category', text: 'Category' }), select),
       el('div', { class: 'field' }, el('label', { for: 'chain', text: 'Chain' }), chainSelect),
       el('div', { class: 'field' }, el('label', { text: 'Watchlist' }), watchToggle),
-      el('div', { class: 'field' }, el('span', { class: 'sub', text: 'Token status' }), el('div', { class: 'tabs' }, pre, live)),
-      el('span', { class: 'count', text: state.tab === 'pre-token' ? rows().length + ' of ' + DATA.board_size + ' rows shown' : DATA.live.length + ' live-token protocols' })
+      el('div', { class: 'field' }, el('span', { class: 'sub', text: 'Token status' }), el('div', { class: 'tabs' }, pre, live, cov)),
+      el('span', { class: 'count', text: state.tab === 'pre-token' ? rows().length + ' of ' + DATA.board_size + ' rows shown' : state.tab === 'live' ? DATA.live.length + ' live-token protocols' : (DATA.coverage ? DATA.coverage.accounted_for + ' of ' + DATA.coverage.total + ' protocols accounted for' : '') })
     );
   }
 
@@ -305,8 +326,13 @@
         el('td', { class: 'num', text: fmtAge(r.age_days) }),
         el('td', null, el('div', { class: 'implied' },
           el('div', { class: 'bar', 'aria-hidden': 'true' }, el('i', { style: 'width:' + Math.max(3, Math.round((r.implied_value_usd / max) * 100)) + '%' })),
-          el('span', { class: 'num', text: fmtUsd(r.implied_value_usd) })
+          el('div', { class: 'name' },
+            el('span', { class: 'num', text: fmtUsd(r.implied_value_usd) }),
+            el('span', { class: 'sub', text: fmtUsd(r.value_low_usd) + '–' + fmtUsd(r.value_high_usd) })
+          )
         )),
+        el('td', { class: 'num', text: fmtUsd(r.expected_value_usd) }),
+        el('td', { class: 'num', text: Math.round(r.issuance_probability * 100) + '%' }),
         el('td', null, el('span', { class: 'status', text: 'pre-token' }))
       );
       tbody.appendChild(tr);
@@ -322,6 +348,8 @@
             sortHeader('growth', '7d'),
             sortHeader('age', 'Age'),
             sortHeader('implied', 'Implied value'),
+            sortHeader('expected', 'Expected'),
+            sortHeader('prob', 'Token prob.'),
             el('th', { scope: 'col', text: 'Token' })
           )),
           tbody
@@ -345,7 +373,7 @@
     return el('div', { class: 'panel' },
       el('div', { class: 'table-wrap' },
         el('table', null,
-          el('caption', { class: 'sub', text: 'Token live: these protocols already trade, so their market cap is a fact, not a model. They are set aside from the pre-token ranking.' }),
+          el('caption', { class: 'sub', text: 'Token live: these protocols already trade, so their market cap is a fact, not a model. All ' + DATA.live.length + ' are set aside from the pre-token ranking; the Coverage tab accounts for the rest.' }),
           el('thead', null, el('tr', null, el('th', { scope: 'col', text: 'Status' }), el('th', { scope: 'col', text: 'Protocol' }), el('th', { scope: 'col', text: 'TVL' }), el('th', { scope: 'col', text: '7d' }), el('th', { scope: 'col', text: 'Market cap' }), el('th', { scope: 'col', text: 'Token' }))),
           tbody
         )
@@ -355,13 +383,63 @@
 
   function modelPanel() {
     var m = DATA.model;
+    var v = DATA.validation;
+    var loo = v ? v.loo : null;
+    var wf = v ? v.walk_forward : null;
+    var fitLine = v
+      ? 'The fit: a grid search on leave-one-out predictions over the ' + loo.n + ' tokenized protocols with a usable market cap (144 record one; 16 record 0 or -1) chose growth ' + m.growth_weight + ', maturity ' + m.maturity_floor + ' + ' + m.maturity_range + '. The objective is flat in the growth weight — median absolute log error 1.569 at 0.0, 1.615 at 0.5, 1.678 at 1.0 — so within a 5% tie band the setting closest to the radar-2 prior was kept, and maturity is what the fit moved (0.8/0.4 beats 0.6/0.4 by about 6%).'
+      : 'The fit: a grid search on leave-one-out predictions over the tokenized protocols chose the growth weight and the maturity floor and range.';
+    var testLine = (loo && wf)
+      ? 'Blind tests, honestly: leave-one-out median error ' + (loo.median_abs_pct_error * 100).toFixed(1) + '% (mean ' + (loo.mean_abs_pct_error * 100).toFixed(0) + '% — a few huge misses dominate the mean), only ' + loo.within_2x + ' of ' + loo.n + ' predictions within 2x of the actual market cap. Walk-forward, fitted on protocols listed before 2025-01-01 and tested on the ' + wf.test_n + ' listed after it: median error ' + (wf.median_abs_pct_error * 100).toFixed(1) + '%, ' + wf.within_2x + ' of ' + wf.test_n + ' within 2x. The model is weak; the ranges show it.'
+      : '';
+    var rangeLine = v
+      ? 'Ranges are earned, not guessed: low = implied x ' + v.ranges.low_factor + ', high = implied x ' + v.ranges.high_factor + ' — the 25th and 75th percentiles of actual over leave-one-out implied across the tokenized protocols, the middle 50% of backtested outcomes.'
+      : '';
     return el('section', { class: 'panel model' },
       el('h2', { text: 'How implied value is computed' }),
       el('p', { class: 'sub', text: 'Every row is scored by one function of the snapshot figures. No protocol name is special-cased, and no row is hand-picked.' }),
       el('div', { class: 'formula' },
         'implied = round( tvl_usd x category multiple x (1 + clamp(change_7d, ' + m.growth_floor + ', ' + m.growth_cap + ') / 100 x ' + m.growth_weight + ') x (' + m.maturity_floor + ' + min(age_days, ' + m.maturity_days + ') / ' + m.maturity_days + ' x ' + m.maturity_range + ') )'
       ),
-      el('p', { class: 'sub', text: 'The category multiple is the median market-cap-to-TVL ratio of the tokenized protocols in the same category in this snapshot (at least three comps; a thinner category uses the snapshot-wide median ' + DATA.overall_multiple + ', clamped to ' + m.multiple_floor + '–' + m.multiple_cap + '). TVL and seven-day growth come from the snapshot. Age is the time since the protocol was first listed, the best record of how long it has run with no token; an unlisted age uses ' + m.unknown_age_days + ' days. The early radar is every pre-token protocol below the watchlist floor, by TVL, and the live-token protocols are set aside with their market caps shown.' })
+      el('p', { class: 'sub', text: 'The category multiple is the median market-cap-to-TVL ratio of the tokenized protocols in the same category in this snapshot (at least three comps; a thinner category uses the snapshot-wide median ' + DATA.overall_multiple + ', clamped to ' + m.multiple_floor + '–' + m.multiple_cap + '). TVL and seven-day growth come from the snapshot. Age is the time since the protocol was first listed, the best record of how long it has run with no token; an unlisted age uses ' + m.unknown_age_days + ' days.' }),
+      el('p', { class: 'sub', text: fitLine }),
+      el('p', { class: 'sub', text: testLine }),
+      el('p', { class: 'sub', text: rangeLine }),
+      el('p', { class: 'sub', text: 'Token probability is the shrunk share of protocols in the row’s age x TVL cohort that record a token in this snapshot (20 pseudo-counts towards the overall 55% rate): a record share, not a forecast. Expected value = implied x probability. Ranks are by implied value, because the gate requires implied value not to rise as rank ascends; the table also sorts by expected value. "Pre-token" means the record lists no token — it is not proof a token will ever exist, and implied value is this entry’s own claim, not a price.' })
+    );
+  }
+
+  function coverageTable() {
+    var cov = DATA.coverage;
+    if (!cov) return el('div', { class: 'panel' }, el('div', { class: 'empty' }, el('h2', { text: 'No coverage data' })));
+    var reasons = ['all', 'live-token', 'token-on-record', 'excluded'];
+    var labels = { 'live-token': 'Live token', 'token-on-record': 'Token on record', 'excluded': 'Excluded' };
+    var list = cov.accounted.filter(function (a) { return state.coverageReason === 'all' || a.reason === state.coverageReason; });
+    var select = el('select', { id: 'coverage-reason', 'aria-label': 'Filter by reason' },
+      reasons.map(function (r) { return el('option', { value: r, text: r === 'all' ? 'All reasons' : labels[r], selected: r === state.coverageReason ? 'selected' : null }); })
+    );
+    select.addEventListener('change', function () { state.coverageReason = select.value; render(); });
+    var tbody = el('tbody');
+    list.forEach(function (a) {
+      tbody.appendChild(el('tr', null,
+        el('td', null, el('div', { class: 'name' }, el('b', { text: a.name }), el('span', { class: 'sub', text: a.slug }))),
+        el('td', null, el('span', { class: 'status', text: labels[a.reason] || a.reason })),
+        el('td', null, el('span', { class: 'sub', text: a.detail }))
+      ));
+    });
+    return el('div', { class: 'panel' },
+      el('div', { class: 'controls' }, el('div', { class: 'field' }, el('label', { for: 'coverage-reason', text: 'Reason' }), select), el('span', { class: 'count', text: list.length + ' of ' + cov.accounted.length + ' accounted protocols shown' })),
+      el('div', { class: 'table-wrap' },
+        el('table', null,
+          el('caption', { class: 'sub', text: 'Every protocol in the snapshot is either ranked (' + cov.ranked + ') or listed here: ' + cov.live_token + ' live-token, ' + cov.token_on_record + ' recording a token but no market cap, ' + cov.excluded + ' pre-token but excluded by the watchlist rule (exchange, wrapped, staked or bridged product, versioned pool). ' + cov.accounted_for + ' of ' + cov.total + ' accounted for.' }),
+          el('thead', null, el('tr', null,
+            el('th', { scope: 'col', text: 'Protocol' }),
+            el('th', { scope: 'col', text: 'Reason' }),
+            el('th', { scope: 'col', text: 'Detail' })
+          )),
+          tbody
+        )
+      )
     );
   }
 
@@ -397,10 +475,14 @@
         el('div', null, el('span', { text: 'Growth multiplier' }), el('b', { class: 'num', text: String(row.growth_multiplier) })),
         el('div', null, el('span', { text: 'Maturity multiplier' }), el('b', { class: 'num', text: String(row.maturity_multiplier) })),
         el('div', null, el('span', { text: 'Implied value' }), el('b', { class: 'num', text: fmtUsd(row.implied_value_usd) })),
+        el('div', null, el('span', { text: 'Value range (LOO middle 50%)' }), el('b', { class: 'num', text: fmtUsd(row.value_low_usd) + '–' + fmtUsd(row.value_high_usd) })),
+        el('div', null, el('span', { text: 'Token-record probability' }), el('b', { class: 'num', text: Math.round(row.issuance_probability * 100) + '% (' + row.issuance_cohort + ')' })),
+        el('div', null, el('span', { text: 'Expected value' }), el('b', { class: 'num', text: fmtUsd(row.expected_value_usd) })),
         el('div', null, el('span', { text: 'Share of the board' }), el('b', { class: 'num', text: share }))
       ),
       el('p', { class: 'sub', text: multipleNote }),
-      el('p', { class: 'sub', text: 'Model ' + DATA.model_version + ': the same function scores every protocol. The page recomputes this row as ' + fmtUsd(impliedOf(row, DATA.model)) + (impliedOf(row, DATA.model) === row.implied_value_usd ? ', the same number board.json carries.' : ', which differs from the board: the data would be stale.') + ' This is an estimate, not a price.' })
+      el('p', { class: 'sub', text: 'The probability is the shrunk share of protocols in this age and TVL cohort that record a token — a record share, not a forecast that one launches. Ranks are by implied value; expected value is implied x probability, and the table sorts by it too.' }),
+      el('p', { class: 'sub', text: 'Model ' + DATA.model_version + ': the same function scores every protocol. The page recomputes this row as ' + fmtUsd(impliedOf(row, DATA.model)) + (impliedOf(row, DATA.model) === row.implied_value_usd ? ', the same number board.json carries.' : Math.abs(impliedOf(row, DATA.model) - row.implied_value_usd) <= 100 ? ', within $' + Math.abs(impliedOf(row, DATA.model) - row.implied_value_usd) + ' of the board number (whole-dollar distinctness adjustment).' : ', which differs from the board: the data would be stale.') + ' This is an estimate, not a price.' })
     ));
     dialog.appendChild(el('section', { class: 'detail-section' },
       el('h3', { text: 'Farm plan' }),
@@ -425,7 +507,7 @@
     shell.appendChild(lede());
     if (state.tab === 'pre-token') shell.appendChild(leaders());
     shell.appendChild(controls());
-    shell.appendChild(state.tab === 'pre-token' ? boardTable() : liveTable());
+    shell.appendChild(state.tab === 'pre-token' ? boardTable() : state.tab === 'live' ? liveTable() : coverageTable());
     if (state.tab === 'pre-token') shell.appendChild(modelPanel());
     app.appendChild(shell);
     app.setAttribute('aria-busy', 'false');

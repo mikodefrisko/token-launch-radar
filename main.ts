@@ -1,14 +1,17 @@
-// A working token-radar-01 entry (Node 22, standard library only), model radar-2.
+// A working token-radar-01 entry (Node 22, standard library only), model radar-3.
 //
 // The program reads the sealed snapshot from /input/snapshot.json (or --input <file|dir>), scores every
-// pre-token protocol with the model in lib/model.ts, writes the ranked board to /output/board.json, and
-// copies this repository's dashboard/ and screenshots/ to /output. Last, it writes /output/dossier.json,
-// the summary the judge reads, with the vendored make.fun library.
+// pre-token protocol with the model in lib/model.ts, writes the ranked board to /output/board.json,
+// writes the validation (fit, blind walk-forward, ranges, issuance cohorts, coverage) to
+// /output/validation.json, and copies this repository's dashboard/ and screenshots/ to /output.
+// Last, it writes /output/dossier.json, the summary the judge reads, with the vendored make.fun library.
 //
-// The radar-2 model derives its base multiple from the snapshot itself: for each category, the median
-// market-cap-to-TVL ratio of that category's tokenized protocols (at least three comps), else the
-// snapshot-wide median; growth and age adjust it from there. The board covers the whole watchlist and
-// adds every rankable pre-token protocol below the floor, so the radar finds launches early.
+// The radar-3 model fits its terms to the snapshot itself: a grid search on leave-one-out predictions
+// over the tokenized protocols chooses the growth weight and the maturity floor and range (within a
+// 5% tie band, closest to the radar-2 prior, because the objective is flat in the growth weight);
+// the value range comes from the leave-one-out error distribution; issuance probability is the
+// shrunk token-record share of the protocol's age x TVL cohort. The board ranks every pre-token
+// protocol the house's watchlist rule keeps (198 rows) and accounts for all 758 protocols.
 //
 // The dashboard is a static page, no framework and no network: dashboard/index.html, dashboard/app.css
 // and dashboard/app.js read /output/data.js, which this program writes from the same board.
@@ -46,7 +49,7 @@ if (!existsSync(inputFile)) {
 const out = arg('output', process.env.MAKEFUN_OUTPUT_DIR ?? '/output');
 
 const snapshot = parseSnapshot(readFileSync(inputFile, 'utf8'));
-const { board, radar } = buildRadar(snapshot);
+const { board, radar, validation } = buildRadar(snapshot);
 const issue = boardIssue(board, snapshot);
 if (issue !== null) {
   process.stderr.write(`token radar: the model wrote a board the gate refuses: ${issue}\n`);
@@ -55,6 +58,7 @@ if (issue !== null) {
 
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'board.json'), `${JSON.stringify({ rows: board })}\n`);
+writeFileSync(join(out, 'validation.json'), `${JSON.stringify(validation, null, 2)}\n`);
 writeFileSync(join(out, 'data.js'), dataScript(radar));
 
 /** Copy one directory's regular files into `to`, skipping names that start with a dot. */
@@ -89,6 +93,7 @@ for (const name of shots) {
 writeFileSync(join(out, 'dossier.json'), buildDossier(out, { text_max_bytes: TEXT_MAX_BYTES, screenshots: SCREENSHOT_CAPS, dashboard: { max_files: 400, max_bytes: 4_194_304 } }));
 
 process.stdout.write(
-  `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.live_size} live set aside), model ${MODEL_VERSION}\n` +
-    `token radar: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')} (3 files), ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
+  `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.live_size} live set aside), model ${MODEL_VERSION} (growth ${radar.model.growth_weight}, maturity ${radar.model.maturity_floor}+${radar.model.maturity_range})\n` +
+    `token radar: LOO median error ${(validation.loo.median_abs_pct_error * 100).toFixed(1)}%, ${validation.loo.within_2x}/${validation.loo.n} within 2x; walk-forward ${validation.walk_forward.cutoff} median error ${(validation.walk_forward.median_abs_pct_error * 100).toFixed(1)}%, ${validation.walk_forward.within_2x}/${validation.walk_forward.test_n} within 2x; coverage ${radar.coverage.accounted_for}/${radar.coverage.total}\n` +
+    `token radar: wrote ${join(out, 'board.json')}, ${join(out, 'validation.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')} (3 files), ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
 );
