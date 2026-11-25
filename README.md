@@ -16,8 +16,9 @@ Account: @golden-badger-44 · wallet `ApmXVZkSs74N5Z9hkSNMHA6abUbKyEoS5BNmhdAM6z
   on record) plus 158 pre-token protocols the house's watchlist rule keeps, at any
   TVL — the whole honest set. Ranked by implied value, each row also carrying a
   value range, an issuance probability and an expected value.
-- `validation.json` — the fit and its blind tests (grid search, leave-one-out and
-  two walk-forward tests, range factors, issuance cohorts, coverage counts).
+- `validation.json` — the fit and its blind tests (regression candidates,
+  leave-one-out and two walk-forward tests, range factors, issuance cohorts,
+  coverage counts).
 - `data.js` + `dashboard/` — a static page (no network, no fetch) with the board,
   a per-protocol detail view with the model's inputs, value range, issuance
   probability and a farm plan, search, category / chain filters, a watchlist-only
@@ -27,40 +28,37 @@ Account: @golden-badger-44 · wallet `ApmXVZkSs74N5Z9hkSNMHA6abUbKyEoS5BNmhdAM6z
 - `screenshots/` — 3 real screenshots of the dashboard (board, detail, filtered).
 - `dossier.json` — built with the vendored `vendor/makefun-board.ts`.
 
-## The model (radar-3)
+## The model (radar-4)
 
 Implied value follows only from the snapshot's own figures — never from a
-hardcoded list of names — and its terms are FIT, not asserted. The base multiple
-is derived from the snapshot itself:
+hardcoded list of names — and its terms are FIT, not asserted. It is a pooled
+log-log regression over the 128 tokenized protocols with a usable market cap
+(144 record one; 16 record 0 or −1):
 
-- **Category multiple** = median market-cap/TVL of the tokenized protocols in
-  the same category (at least 3 comps); a category with fewer comps uses the
-  snapshot-wide median **0.2138**. Every multiple is clamped to [0.05, 1.00].
-- **Growth multiplier** = `1 + clamp(change_7d, -60, 120) / 100 × 0.5`.
-- **Maturity multiplier** = `0.8 + min(age_days, 1095) / 1095 × 0.4`
-  (age = days since DefiLlama first listed the protocol; unknown age = 365 days).
-- **Implied value** = `round(tvl_usd × category multiple × growth × maturity)`.
+- **Implied value** = `round(exp(6.9646 + 0.5223 × ln(tvl_usd)))`.
+- **Slope 0.5223 (SE 0.0949, t = 5.51)**: a 10% higher TVL is associated with a
+  ~5.2% higher market cap. The slope is far below 1.0, which is why the
+  radar-3 category-median model (slope fixed at 1.0) over-valued the biggest
+  TVL protocols. Age and category terms were tried (9 specifications, scored by
+  leave-one-out median absolute log error) and every one of them made LOO
+  worse, so none is shipped; the growth term's coefficient is insignificant
+  (−3.714 ± 2.299, t = −1.62) with the wrong sign, so it is not shipped either.
 
-The fit: a grid search over growth weight {0, 0.25, 0.5, 0.75, 1.0}, maturity
-floor {0.6, 0.8, 1.0} and maturity range {0, 0.2, 0.4} minimises the median
-absolute log error of leave-one-out predictions (each tokenized protocol scored
-with itself left out of its category multiple) over the 128 tokenized protocols
-with a usable market cap (144 record one; 16 record 0 or -1). The objective is
-flat in the growth weight (1.569 at 0.0, 1.615 at 0.5, 1.678 at 1.0), so among
-settings within 5% of the best the one closest to the radar-2 prior
-(0.5 / 0.6 / 0.4) is kept — growth 0.5, maturity 0.8 / 0.4. Maturity is what the
-fit actually moved (0.8/0.4 beats 0.6/0.4 by ~6%).
-
-Blind tests, honestly: leave-one-out median absolute error **92.2%** (mean
-3,667% — a few huge misses dominate the mean), only **25 of 128** predictions
-within 2× of the actual market cap. Walk-forward — multiples fitted on
-protocols listed before 2025-01-01, tested on the 31 listed after it — median
-error **82.9%**, 10 of 31 within 2×; a second cutoff (2024-07-01) gives 98.4%,
-9 of 43 within 2×. The model is weak, and the ranges say so: each row's
-`value_low_usd` / `value_high_usd` are the implied value × 0.229 / × 5.53, the
-25th and 75th percentiles of (actual mcap / leave-one-out implied) — the middle
-50% of backtested outcomes. Full numbers: `out/validation.json` and
-`VALIDATION-radar3.md`.
+Blind tests, honestly: leave-one-out median absolute error **85.2%** (mean
+986% — a few huge misses dominate the mean), **41 of 128** predictions within
+2× of the actual market cap, median absolute log error **1.223**. Walk-forward
+— regression fitted on protocols listed before 2025-01-01, tested on the 31
+listed after it — median error **89.2%**, 8 of 31 within 2×, median log error
+1.124; a second cutoff (2024-07-01) gives 90.9%, 14 of 43 within 2×, median
+log error 1.151. Against radar-3 (LOO 92.2% / 25 of 128, WF25 82.9% / 10 of 31,
+WF24 98.4% / 9 of 43), radar-4 wins on the symmetric log metric on all three
+blind tests (1.223 vs 1.615; 1.124 vs 1.469; 1.151 vs 1.653) and on the % median
+on LOO and WF24, but **loses the WF25 % median** (89.2% vs 82.9%) — driven by
+two large over-predictions in the 31-protocol test set. The model is still
+weak, and the ranges say so: each row's `value_low_usd` / `value_high_usd` are
+the implied value × 0.306 / × 4.194, the 25th and 75th percentiles of (actual
+mcap / leave-one-out implied) — the middle 50% of backtested outcomes. Full
+numbers: `out/validation.json` and `VALIDATION-radar4.md`.
 
 **Issuance probability** is the shrunk share of protocols in the row's age × TVL
 cohort that record a token in this snapshot (20 pseudo-counts towards the
@@ -78,26 +76,10 @@ the house rule 144 (42 centralised exchanges, 38 Liquid Staking, 28 Bridge,
 5 wrapped/staked-named). The board ranks no wrapped, staked or bridged product
 of a token that already trades.
 
-Category multiples in this snapshot (median mcap/TVL of tokenized comps):
-
-| Category | Multiple | Category | Multiple |
-| --- | --- | --- | --- |
-| Cross Chain Bridge | 1.0000 | Yield | 0.1914 |
-| Privacy | 0.9691 | CDP | 0.1687 |
-| Canonical Bridge | 0.7464 | Yield Aggregator | 0.1510 |
-| Basis Trading | 0.6544 | Indexes | 0.1477 |
-| Bridge | 0.5567 | Lending | 0.1324 |
-| Dexs | 0.3424 | CEX | 0.0748 |
-| RWA | 0.2748 | Liquid Staking | 0.0500 |
-| Snapshot-wide median | 0.2138 | | |
-
-Categories with fewer than three tokenized comps (Risk Curators, Onchain Capital
-Allocator, Chain, Restaking, …) use the snapshot-wide median 0.2138.
-
-Top of the board: Steakhouse Financial $581,386,289 (range $133M–$3,215M, token
-probability 0.54, expected $313,948,596) · Sentora Curator $565,932,521 ·
-Gauntlet $346,259,572 · Veda $330,293,643 · USDD $179,686,873. Board total
-implied value $4,550,382,504; total expected value $2,306,317,862. All 198
+Top of the board: Sentora Curator $90,255,909 (range $27.6M–$378.5M, token
+probability 0.54, expected $48,738,191) · Steakhouse Financial $90,194,278 ·
+Gauntlet $67,423,830 · Veda $67,104,619 · USDD $54,664,159. Board total
+implied value $2,273,601,956; total expected value $1,074,367,830. All 198
 implied values are distinct. Note on the snapshot's record: USDD and Bittensor
 dTAO rank high because the snapshot records no token for them, even though
 their tokens trade in the real world — the board follows the snapshot's record,
@@ -129,11 +111,11 @@ Requires Node 22+. No network, no dependencies, no secrets. The program exits
 non-zero if the board misses any watchlist slug, ranks out of order, or a farm
 plan breaks its length rules.
 
-Screenshots were re-taken for radar-3 from the rebuilt dashboard in a headed
-Chromium under Xvfb (the headless binary exits without rendering in this
-environment; captures via CDP `Page.captureScreenshot`): board at 1440×900
-(150 KB), detail via `#p=steakhouse-financial` (214 KB), filtered via
-`#category=Risk%20Curators` (154 KB). All three were visually checked against
+Screenshots were re-taken for radar-4 from the rebuilt dashboard with the
+Playwright-managed headless shell (the Meta-chromium binary at
+`/opt/meta-chromium/chrome` refuses to start in this VM): board at 1440×900
+(153 KB), detail via `#p=sentora-curator` (212 KB), filtered via
+`#category=Risk%20Curators` (153 KB). All three were visually checked against
 the rebuilt page.
 
 ---

@@ -28,14 +28,10 @@
   }
   // The model in one function: the page recomputes a row from the snapshot figures and checks the
   // number board.json carries, so the page's code and the board's data are visibly the same arithmetic.
-  // The multiple is the row's own category multiple, derived from the tokenized protocols in that
-  // category in this snapshot (the snapshot-wide median when the category has fewer than three comps).
+  // The regression is log(market cap) = intercept + slope x log(TVL), fitted by OLS over the
+  // tokenized protocols in this snapshot; implied value is exp() of the fitted log value.
   function impliedOf(row, model) {
-    var growth = Math.min(model.growth_cap, Math.max(model.growth_floor, row.change_7d === null || row.change_7d === undefined ? 0 : row.change_7d));
-    var growthMult = 1 + (growth / 100) * model.growth_weight;
-    var age = row.age_days === null || row.age_days === undefined ? model.unknown_age_days : row.age_days;
-    var maturity = model.maturity_floor + (Math.min(Math.max(age, 0), model.maturity_days) / model.maturity_days) * model.maturity_range;
-    return Math.max(1, Math.round(row.tvl_usd * row.multiple * growthMult * maturity));
+    return Math.max(1, Math.round(Math.exp(model.intercept + model.slope * Math.log(row.tvl_usd))));
   }
   // The board's whole implied value, for a row's share of it.
   var totalImplied = DATA.rows.reduce(function (sum, r) { return sum + r.implied_value_usd; }, 0) || 1;
@@ -387,8 +383,8 @@
     var loo = v ? v.loo : null;
     var wf = v ? v.walk_forward : null;
     var fitLine = v
-      ? 'The fit: a grid search on leave-one-out predictions over the ' + loo.n + ' tokenized protocols with a usable market cap (144 record one; 16 record 0 or -1) chose growth ' + m.growth_weight + ', maturity ' + m.maturity_floor + ' + ' + m.maturity_range + '. The objective is flat in the growth weight — median absolute log error 1.569 at 0.0, 1.615 at 0.5, 1.678 at 1.0 — so within a 5% tie band the setting closest to the radar-2 prior was kept, and maturity is what the fit moved (0.8/0.4 beats 0.6/0.4 by about 6%).'
-      : 'The fit: a grid search on leave-one-out predictions over the tokenized protocols chose the growth weight and the maturity floor and range.';
+      ? 'The fit: nine candidate specifications — the pooled log-log line, category intercepts, category slopes, log-age and 7-day-growth terms and combinations — were scored by leave-one-out median absolute log error over the ' + loo.n + ' tokenized protocols with a usable market cap (144 record one; 16 record 0 or -1). The pooled line wins outright (median log error ' + v.candidates.best_median_abs_log_error.toFixed(3) + ' vs ' + v.candidates.variants[1].median_abs_log_error.toFixed(3) + ' for the next-best candidate), so no tie rule fires. Category and age terms all score worse out of sample, and the growth term is insignificant (coefficient ' + v.candidates.regression.growth_coef.toFixed(2) + ' ± ' + v.candidates.regression.growth_se.toFixed(2) + ', t = ' + v.candidates.regression.growth_t.toFixed(2) + ') with a counterintuitive negative sign, so none of them is shipped. The slope is ' + m.slope + ' ± ' + v.candidates.regression.slope_se.toFixed(3) + ': market cap grows with roughly the square root of TVL, not in proportion to it.'
+      : 'The fit: nine candidate specifications were scored by leave-one-out median absolute log error; the pooled log-log line wins outright.';
     var testLine = (loo && wf)
       ? 'Blind tests, honestly: leave-one-out median error ' + (loo.median_abs_pct_error * 100).toFixed(1) + '% (mean ' + (loo.mean_abs_pct_error * 100).toFixed(0) + '% — a few huge misses dominate the mean), only ' + loo.within_2x + ' of ' + loo.n + ' predictions within 2x of the actual market cap. Walk-forward, fitted on protocols listed before 2025-01-01 and tested on the ' + wf.test_n + ' listed after it: median error ' + (wf.median_abs_pct_error * 100).toFixed(1) + '%, ' + wf.within_2x + ' of ' + wf.test_n + ' within 2x. The model is weak; the ranges show it.'
       : '';
@@ -399,9 +395,9 @@
       el('h2', { text: 'How implied value is computed' }),
       el('p', { class: 'sub', text: 'Every row is scored by one function of the snapshot figures. No protocol name is special-cased, and no row is hand-picked.' }),
       el('div', { class: 'formula' },
-        'implied = round( tvl_usd x category multiple x (1 + clamp(change_7d, ' + m.growth_floor + ', ' + m.growth_cap + ') / 100 x ' + m.growth_weight + ') x (' + m.maturity_floor + ' + min(age_days, ' + m.maturity_days + ') / ' + m.maturity_days + ' x ' + m.maturity_range + ') )'
+        'implied = round( exp( ' + m.intercept + ' + ' + m.slope + ' x ln(tvl_usd) ) )'
       ),
-      el('p', { class: 'sub', text: 'The category multiple is the median market-cap-to-TVL ratio of the tokenized protocols in the same category in this snapshot (at least three comps; a thinner category uses the snapshot-wide median ' + DATA.overall_multiple + ', clamped to ' + m.multiple_floor + '–' + m.multiple_cap + '). TVL and seven-day growth come from the snapshot. Age is the time since the protocol was first listed, the best record of how long it has run with no token; an unlisted age uses ' + m.unknown_age_days + ' days.' }),
+      el('p', { class: 'sub', text: 'The line is fitted by ordinary least squares on log market cap against log TVL over the tokenized protocols in this snapshot (the 128 with a positive market cap and a positive TVL). exp() of the fitted log value is the median prediction on the log scale. TVL comes from the snapshot; age and seven-day growth are shown for each row but are not model inputs — neither helped out of sample. Age is the time since the protocol was first listed, the best record of how long it has run with no token.' }),
       el('p', { class: 'sub', text: fitLine }),
       el('p', { class: 'sub', text: testLine }),
       el('p', { class: 'sub', text: rangeLine }),
@@ -453,9 +449,7 @@
     writeHash();
     dialog.textContent = '';
     var steps = farmSteps(row);
-    var multipleNote = row.multiple_n >= 3
-      ? 'Median mcap/TVL of ' + row.multiple_n + ' tokenized ' + (row.category || 'Other') + ' protocols in this snapshot.'
-      : 'Snapshot-wide median ' + DATA.overall_multiple + ': this category has fewer than three tokenized comps in the snapshot.';
+    var multipleNote = 'The fitted line implies a market cap of ' + fmtUsd(row.implied_value_usd) + ' at this TVL: exp(' + DATA.model.intercept + ' + ' + DATA.model.slope + ' x ln(' + fmtUsd(row.tvl_usd) + ')). The effective multiple is ' + (row.implied_value_usd / row.tvl_usd).toFixed(4) + ' — it falls as TVL rises, because the slope is below 1.';
     var share = (row.implied_value_usd / totalImplied * 100).toFixed(2) + '%';
     dialog.appendChild(el('div', { class: 'detail-head' },
       el('div', null,
@@ -469,11 +463,11 @@
       el('h3', { text: 'Implied value' }),
       el('div', { class: 'equation' },
         el('div', null, el('span', { text: 'TVL' }), el('b', { class: 'num', text: fmtUsd(row.tvl_usd) })),
-        el('div', null, el('span', { text: 'Category multiple' }), el('b', { class: 'num', text: String(row.multiple) })),
-        el('div', null, el('span', { text: 'Seven-day growth' }), el('b', { class: 'num', text: fmtPct(row.change_7d) })),
+        el('div', null, el('span', { text: 'log TVL' }), el('b', { class: 'num', text: String(row.log_tvl) })),
+        el('div', null, el('span', { text: 'Intercept' }), el('b', { class: 'num', text: String(DATA.model.intercept) })),
+        el('div', null, el('span', { text: 'Slope' }), el('b', { class: 'num', text: String(DATA.model.slope) })),
+        el('div', null, el('span', { text: 'Fitted log market cap' }), el('b', { class: 'num', text: row.fitted_log_mcap.toFixed(4) })),
         el('div', null, el('span', { text: 'Age with no token' }), el('b', { class: 'num', text: fmtAge(row.age_days) })),
-        el('div', null, el('span', { text: 'Growth multiplier' }), el('b', { class: 'num', text: String(row.growth_multiplier) })),
-        el('div', null, el('span', { text: 'Maturity multiplier' }), el('b', { class: 'num', text: String(row.maturity_multiplier) })),
         el('div', null, el('span', { text: 'Implied value' }), el('b', { class: 'num', text: fmtUsd(row.implied_value_usd) })),
         el('div', null, el('span', { text: 'Value range (LOO middle 50%)' }), el('b', { class: 'num', text: fmtUsd(row.value_low_usd) + '–' + fmtUsd(row.value_high_usd) })),
         el('div', null, el('span', { text: 'Token-record probability' }), el('b', { class: 'num', text: Math.round(row.issuance_probability * 100) + '% (' + row.issuance_cohort + ')' })),

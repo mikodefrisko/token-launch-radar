@@ -1,29 +1,35 @@
 // The token radar's model: one snapshot of the protocol universe in, one ranked board out.
 //
-// radar-3. The model is FIT to the snapshot instead of asserted: every value term is chosen by a
-// grid search on leave-one-out predictions over the tokenized protocols, and the fit is reported
-// honestly, including where it is weak (see `validateModel` and VALIDATION-radar3.md).
+// radar-4. The model is a LOG-LOG TVL REGRESSION, fitted to the snapshot itself:
+//   log(market cap) = intercept + slope x log(TVL)
+// fitted by ordinary least squares over the 128 tokenized protocols with a usable
+// market cap (144 record one; 16 record 0 or -1). Implied value is exp() of the
+// fitted log value — the median prediction on the log scale. The slope is 0.52:
+// market cap grows with the square root of TVL, not in proportion to it, which is
+// why a category-median multiple (slope fixed at 1.0) mis-ranks the board.
 //
-//   multiple     = median(mcap_usd / tvl_usd) over tokenized comps in the protocol's category
-//                  (n >= 3 after leaving the protocol itself out), else the snapshot-wide median;
-//                  clamped to [0.05, 1.00]
-//   growth       = clamp(change_7d, -60, 120) per cent
-//   growthMult   = 1 + (growth / 100) x GROWTH_WEIGHT        (fitted; see fitModel)
-//   maturity     = MATURITY_FLOOR + min(age_days, 1095) / 1095 x MATURITY_RANGE   (fitted)
-//   implied      = max(1, round(tvl_usd x multiple x growthMult x maturity))
+// Nine candidate specifications were tried and scored by leave-one-out median
+// absolute log error (see `fitRegression`): the pooled regression, category
+// intercepts, category slopes, log-age and 7-day-growth terms, and combinations.
+// Category and age terms do NOT help out of sample — every one of them scores
+// worse on leave-one-out than the pooled line — and the growth term's coefficient
+// is insignificant (t = -1.62) with a counterintuitive negative sign, so it is
+// not shipped either. The pooled line wins outright (LOO median log error 1.223
+// vs 1.325 for the next-best candidate), and it is also the simplest. The
+// selection rule is: lowest LOO median absolute log error; within a 5% tie band,
+// the fewest terms. No tie occurred.
 //
-// The grid search minimises the median absolute log error of leave-one-out predictions
-// (implied vs actual market cap) over the 128 tokenized protocols with a usable market cap
-// (144 record one; 16 record 0 or -1 and cannot form a ratio). The objective is FLAT in the
-// growth weight — 1.569 at weight 0.0, 1.615 at 0.5, 1.678 at 1.0 — so no growth weight is
-// distinguishable from any other at n = 128. The selection rule is therefore: among grid
-// settings within 5% of the best median absolute log error, take the one closest to the
-// radar-2 prior (growth 0.5, maturity floor 0.6, maturity range 0.4). That selects
-// growth 0.5, maturity floor 0.8, maturity range 0.4: the growth term is kept because the
-// data cannot reject it, and maturity is fitted (0.8/0.4 beats 0.6/0.4 by ~6%).
-// The fitted model is still weak in absolute terms — leave-one-out median absolute error
-// ~92%, only ~20% of predictions within 2x of the actual market cap — and the value ranges
-// below are taken from that error distribution, not invented.
+// The fitted line is still weak in absolute terms — leave-one-out median absolute
+// error ~85%, only ~32% of predictions within 2x of the actual market cap — and
+// the value ranges below are taken from that error distribution, not invented.
+// But it beats radar-3 (category-median multiple) on the symmetric log metric on
+// every blind test: LOO median log error 1.223 vs 1.615, walk-forward 2025-01-01
+// 1.124 vs 1.469, walk-forward 2024-07-01 1.151 vs 1.653; paired wins 81/128,
+// 21/31 and 31/43. On the asymmetric median % error it beats radar-3 on LOO
+// (85.2% vs 92.2%) and on walk-forward 2024-07-01 (90.9% vs 98.4%) but NOT on
+// walk-forward 2025-01-01 (89.2% vs 82.9%): two large over-predictions
+// (infrared-finance, falcon-finance) inflate the % median there, while the log
+// median — the metric the fit minimises — favours radar-4. See VALIDATION-radar4.md.
 //
 // A protocol is pre-token when its index entry records no token (no market cap, no CoinGecko
 // id, no symbol). The board ranks every pre-token protocol the house's own watchlist rule
@@ -67,45 +73,41 @@ export interface Snapshot {
   watchlist: string[];
 }
 
-/** The model's constants, as the dashboard states them and the sandbox may change them. */
+/** The fitted log-log regression: log(mcap) = intercept + slope x log(TVL). Rounded to four decimals, and the board is computed from the rounded figures, so the board, the dashboard data and the page's recompute all agree exactly. */
 export interface ModelConstants {
-  growth_weight: number;
-  growth_floor: number;
-  growth_cap: number;
-  maturity_floor: number;
-  maturity_range: number;
-  maturity_days: number;
-  unknown_age_days: number;
-  multiple_floor: number;
-  multiple_cap: number;
-  min_comps: number;
+  intercept: number;
+  slope: number;
 }
 
-/** radar-2's constants: the prior the fitted selection is shrunk towards, not the shipped model. */
-export const PRIOR_MODEL: ModelConstants = {
-  growth_weight: 0.5,
-  growth_floor: -60,
-  growth_cap: 120,
-  maturity_floor: 0.6,
-  maturity_range: 0.4,
-  maturity_days: 1095,
-  unknown_age_days: 365,
-  multiple_floor: 0.05,
-  multiple_cap: 1.0,
-  min_comps: 3,
-};
+/** One candidate specification for the candidate table: which secondary terms it adds to the pooled line. */
+export interface CandidateSpec {
+  name: string;
+  cats: boolean;
+  catSlopeMin: number | null;
+  age: boolean;
+  growth: boolean;
+}
 
-/** The grid the fit searches: growth weights, maturity floors, maturity ranges. */
-export const FIT_GRID = {
-  growth_weights: [0, 0.25, 0.5, 0.75, 1.0],
-  maturity_floors: [0.6, 0.8, 1.0],
-  maturity_ranges: [0, 0.2, 0.4],
-  /** How far above the best median absolute log error a setting may sit and still count as tied. */
-  tie_band: 0.05,
-};
+/** The nine candidates the fit scores by leave-one-out median absolute log error. */
+export const CANDIDATES: CandidateSpec[] = [
+  { name: 'pooled log-log', cats: false, catSlopeMin: null, age: false, growth: false },
+  { name: 'pooled + category intercepts (n>=3)', cats: true, catSlopeMin: null, age: false, growth: false },
+  { name: 'pooled + category intercepts + log(age)', cats: true, catSlopeMin: null, age: true, growth: false },
+  { name: 'pooled + category intercepts + growth', cats: true, catSlopeMin: null, age: false, growth: true },
+  { name: 'pooled + log(age)', cats: false, catSlopeMin: null, age: true, growth: false },
+  { name: 'pooled + growth', cats: false, catSlopeMin: null, age: false, growth: true },
+  { name: 'pooled + category intercepts + log(age) + growth', cats: true, catSlopeMin: null, age: true, growth: true },
+  { name: 'pooled + category intercepts + category slopes (n>=10)', cats: true, catSlopeMin: 10, age: false, growth: false },
+  { name: 'pooled + category intercepts + category slopes + log(age)', cats: true, catSlopeMin: 10, age: true, growth: false },
+];
+
+/** How many terms a candidate adds beyond the pooled line (intercept + slope): the tie-break prefers fewer. */
+function termCount(spec: CandidateSpec): number {
+  return (spec.cats ? 1 : 0) + (spec.catSlopeMin !== null ? 1 : 0) + (spec.age ? 1 : 0) + (spec.growth ? 1 : 0);
+}
 
 /** The model's version label: the dashboard names it and the rules quote it. */
-export const MODEL_VERSION = 'radar-3';
+export const MODEL_VERSION = 'radar-4';
 
 /** A farm step: the action, what it costs, and how long it takes. */
 export interface FarmStep {
@@ -136,11 +138,10 @@ export interface BoardRow {
   issuance_cohort: string;
   expected_value_usd: number;
   model: {
-    category_multiple: number;
-    category_comps: number;
-    growth_pct: number;
-    growth_multiplier: number;
-    maturity_multiplier: number;
+    intercept: number;
+    slope: number;
+    log_tvl: number;
+    fitted_log_mcap: number;
     age_days: number | null;
   };
   farm_steps: string[];
@@ -164,11 +165,9 @@ export interface RadarRow {
   issuance_probability: number;
   issuance_cohort: string;
   expected_value_usd: number;
-  multiple: number;
-  multiple_n: number;
   watchlist: boolean;
-  growth_multiplier: number;
-  maturity_multiplier: number;
+  log_tvl: number;
+  fitted_log_mcap: number;
 }
 
 /** A live-token protocol: it already trades, so the board shows the market's own value, not a model's. */
@@ -216,16 +215,14 @@ export interface CohortRow {
 export interface Validation {
   model_version: string;
   fit_set: { tokenized_with_mcap: number; usable_for_fit: number; excluded_mcap_le_zero: number };
-  grid: {
-    growth_weights: number[];
-    maturity_floors: number[];
-    maturity_ranges: number[];
+  candidates: {
+    variants: { name: string; terms: number; median_abs_log_error: number; median_abs_pct_error: number; within_2x: number; within_2x_pct: number }[];
     tie_band: number;
     best_median_abs_log_error: number;
-    best_params: { growth_weight: number; maturity_floor: number; maturity_range: number };
-    selected_params: { growth_weight: number; maturity_floor: number; maturity_range: number };
+    best_name: string;
+    selected_name: string;
     selection_rule: string;
-    table: { growth_weight: number; maturity_floor: number; maturity_range: number; median_abs_log_error: number }[];
+    regression: { intercept: number; slope: number; slope_se: number; intercept_se: number; growth_coef: number; growth_se: number; growth_t: number };
   };
   loo: {
     n: number;
@@ -247,6 +244,7 @@ export interface Validation {
     excluded_null_listed: number;
     median_abs_pct_error: number;
     mean_abs_pct_error: number;
+    median_abs_log_error: number;
     within_2x: number;
     within_2x_pct: number;
   };
@@ -257,6 +255,7 @@ export interface Validation {
     excluded_null_listed: number;
     median_abs_pct_error: number;
     mean_abs_pct_error: number;
+    median_abs_log_error: number;
     within_2x: number;
     within_2x_pct: number;
   };
@@ -276,8 +275,6 @@ export interface RadarData {
   board_size: number;
   early_size: number;
   live_size: number;
-  overall_multiple: number;
-  multiples: Record<string, number>;
   rows: RadarRow[];
   live: LiveRow[];
   coverage: Coverage;
@@ -317,14 +314,6 @@ function quantile(sorted: number[], q: number): number {
   return sorted[lo]! * (1 - f) + sorted[hi]! * f;
 }
 
-/** The median of a sorted list with one occurrence of `value` removed, or 0 when nothing is left. */
-function medianExcluding(sorted: number[], value: number): number {
-  const rest = [...sorted];
-  const at = rest.indexOf(value);
-  if (at >= 0) rest.splice(at, 1);
-  return median(rest);
-}
-
 const round4 = (n: number): number => Math.round(n * 1e4) / 1e4;
 const round3 = (n: number): number => Math.round(n * 1e3) / 1e3;
 
@@ -342,132 +331,170 @@ export function fitSet(snapshot: Snapshot): SnapshotProtocol[] {
   return snapshot.protocols.filter((p) => p.mcap_usd !== null && p.mcap_usd > 0 && p.tvl_usd > 0);
 }
 
-/** Sorted market-cap/TVL ratios per category and overall, for leave-one-out medians. */
-interface FitComps {
-  byCategory: Map<string, number[]>;
-  all: number[];
-}
-
-function buildFitComps(pool: SnapshotProtocol[]): FitComps {
-  const byCategory = new Map<string, number[]>();
-  const all: number[] = [];
-  for (const p of pool) {
-    if (p.mcap_usd !== null && p.mcap_usd > 0 && p.tvl_usd > 0) {
-      const ratio = p.mcap_usd / p.tvl_usd;
-      all.push(ratio);
-      if (p.category !== null) {
-        const arr = byCategory.get(p.category) ?? [];
-        arr.push(ratio);
-        byCategory.set(p.category, arr);
-      }
+/** Solve a small dense linear system by Gaussian elimination with partial pivoting. */
+function solveLinear(A: number[][], b: number[]): number[] {
+  const n = b.length;
+  const M = A.map((row, i) => [...row, b[i]!]);
+  for (let c = 0; c < n; c++) {
+    let piv = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(M[r]![c]!) > Math.abs(M[piv]![c]!)) piv = r;
+    if (Math.abs(M[piv]![c]!) < 1e-12) throw new Error('singular design matrix');
+    [M[c], M[piv]] = [M[piv]!, M[c]!];
+    for (let r = c + 1; r < n; r++) {
+      const f = M[r]![c]! / M[c]![c]!;
+      for (let k = c; k <= n; k++) M[r]![k]! -= f * M[c]![k]!;
     }
   }
-  for (const arr of byCategory.values()) arr.sort((a, b) => a - b);
-  all.sort((a, b) => a - b);
-  return { byCategory, all };
-}
-
-/**
- * The category multiple one tokenized protocol gets with ITSELF LEFT OUT: the median of its
- * category's ratios without its own ratio (used only when at least three comps remain), else
- * the snapshot-wide median without its own ratio. Clamped to [multiple_floor, multiple_cap].
- */
-export function looMultiple(
-  protocol: SnapshotProtocol,
-  comps: FitComps,
-  model: ModelConstants = PRIOR_MODEL,
-): { multiple: number; comps: number } {
-  const clamp = (n: number): number => Math.min(model.multiple_cap, Math.max(model.multiple_floor, n));
-  if (protocol.mcap_usd === null || protocol.tvl_usd <= 0) return { multiple: clamp(median(comps.all)), comps: 0 };
-  const own = protocol.mcap_usd / protocol.tvl_usd;
-  const overall = clamp(medianExcluding(comps.all, own));
-  if (protocol.category === null) return { multiple: overall, comps: 0 };
-  const cat = comps.byCategory.get(protocol.category) ?? [];
-  const remaining = cat.length - 1;
-  if (remaining >= model.min_comps) {
-    return { multiple: clamp(medianExcluding(cat, own)), comps: remaining };
+  const x = new Array<number>(n).fill(0);
+  for (let r = n - 1; r >= 0; r--) {
+    let s = M[r]![n]!;
+    for (let k = r + 1; k < n; k++) s -= M[r]![k]! * x[k]!;
+    x[r] = s / M[r]![r]!;
   }
-  return { multiple: overall, comps: remaining };
+  return x;
+}
+
+/** OLS coefficients for a design matrix and target, via the normal equations. */
+function ols(X: number[][], y: number[]): number[] {
+  const p = X[0]!.length;
+  const XtX = Array.from({ length: p }, () => new Array<number>(p).fill(0));
+  const Xty = new Array<number>(p).fill(0);
+  for (let i = 0; i < X.length; i++) {
+    for (let a = 0; a < p; a++) {
+      Xty[a]! += X[i]![a]! * y[i]!;
+      for (let b = 0; b < p; b++) XtX[a]![b]! += X[i]![a]! * X[i]![b]!;
+    }
+  }
+  return solveLinear(XtX, Xty);
+}
+
+/** The categories with at least `minN` protocols in the pool, sorted — the ones that get their own terms. */
+function qualifyingCategories(pool: SnapshotProtocol[], minN: number): string[] {
+  const counts = new Map<string, number>();
+  for (const p of pool) if (p.category !== null) counts.set(p.category, (counts.get(p.category) ?? 0) + 1);
+  return [...counts.entries()].filter(([, n]) => n >= minN).map(([c]) => c).sort();
 }
 
 /**
- * The category multiples, derived from the snapshot itself: for each category, the median
- * market-cap-to-TVL ratio of its tokenized protocols (mcap and TVL both positive), when at least
- * `model.min_comps` of them exist; otherwise the snapshot-wide median. Every multiple is clamped
- * to [multiple_floor, multiple_cap]. `counts` names how many tokenized comps each category had.
- * Used for the shipped board (full sample) and for walk-forward training pools.
+ * One design row for a protocol under a candidate spec. Columns: [1, log TVL,
+ * category-intercept dummies, category-slope terms, log age, growth]. Age uses 365
+ * days when the listing date is unknown; growth is the 7-day TVL change clamped to
+ * [-60, 120] per cent, as a fraction.
  */
-export function categoryMultiples(
+function designRow(
+  protocol: SnapshotProtocol,
+  asOf: string,
+  spec: CandidateSpec,
+  cats: string[],
+  slopeCats: string[],
+): number[] {
+  const row: number[] = [1, Math.log(protocol.tvl_usd)];
+  if (spec.cats) for (const c of cats) row.push(protocol.category === c ? 1 : 0);
+  if (spec.catSlopeMin !== null) {
+    const lt = Math.log(protocol.tvl_usd);
+    for (const c of slopeCats) row.push(protocol.category === c ? lt : 0);
+  }
+  if (spec.age) row.push(Math.log(Math.max(1, ageDays(asOf, protocol.listed_at) ?? 365)));
+  if (spec.growth) row.push(Math.min(120, Math.max(-60, finite(protocol.change_7d, 0))) / 100);
+  return row;
+}
+
+/** One candidate fitted on a pool: OLS on log market cap. Coefficients are rounded to four decimals, and every prediction below uses the rounded figures, so the board, the dashboard data and the page's recompute all agree exactly. */
+function fitCandidate(
   pool: SnapshotProtocol[],
-  model: ModelConstants = PRIOR_MODEL,
-): { multiples: Record<string, number>; counts: Record<string, number>; overall: number } {
-  const byCategory = new Map<string, number[]>();
-  const all: number[] = [];
-  for (const p of pool) {
-    if (p.mcap_usd !== null && p.mcap_usd > 0 && p.tvl_usd > 0) {
-      const ratio = p.mcap_usd / p.tvl_usd;
-      all.push(ratio);
-      if (p.category !== null) {
-        const arr = byCategory.get(p.category) ?? [];
-        arr.push(ratio);
-        byCategory.set(p.category, arr);
-      }
+  asOf: string,
+  spec: CandidateSpec,
+): { beta: number[]; cats: string[]; slopeCats: string[] } {
+  const cats = spec.cats ? qualifyingCategories(pool, 3) : [];
+  const slopeCats = spec.catSlopeMin !== null ? qualifyingCategories(pool, spec.catSlopeMin) : [];
+  const X = pool.map((p) => designRow(p, asOf, spec, cats, slopeCats));
+  const y = pool.map((p) => Math.log(p.mcap_usd!));
+  const beta = ols(X, y).map((b) => Math.round(b * 1e4) / 1e4);
+  return { beta, cats, slopeCats };
+}
+
+/** A candidate's predicted market cap for one protocol. */
+function predictCandidate(
+  fit: { beta: number[]; cats: string[]; slopeCats: string[] },
+  protocol: SnapshotProtocol,
+  asOf: string,
+  spec: CandidateSpec,
+): number {
+  const row = designRow(protocol, asOf, spec, fit.cats, fit.slopeCats);
+  let s = 0;
+  for (let i = 0; i < row.length; i++) s += row[i]! * fit.beta[i]!;
+  return Math.exp(s);
+}
+
+/** Standard errors of a candidate's coefficients on its fit pool (residual variance x the inverse of X'X). */
+function coefStandardErrors(
+  pool: SnapshotProtocol[],
+  asOf: string,
+  spec: CandidateSpec,
+  fit: { beta: number[]; cats: string[]; slopeCats: string[] },
+): number[] {
+  const X = pool.map((p) => designRow(p, asOf, spec, fit.cats, fit.slopeCats));
+  const y = pool.map((p) => Math.log(p.mcap_usd!));
+  const resid = y.map((yi, i) => {
+    let s = 0;
+    for (let j = 0; j < X[i]!.length; j++) s += X[i]![j]! * fit.beta[j]!;
+    return yi - s;
+  });
+  const dof = Math.max(1, pool.length - X[0]!.length);
+  const s2 = resid.reduce((a, b) => a + b * b, 0) / dof;
+  const p = X[0]!.length;
+  const XtX = Array.from({ length: p }, () => new Array<number>(p).fill(0));
+  for (let i = 0; i < X.length; i++) {
+    for (let a = 0; a < p; a++) for (let b = 0; b < p; b++) XtX[a]![b]! += X[i]![a]! * X[i]![b]!;
+  }
+  const M = XtX.map((row, i) => [...row, ...Array.from({ length: p }, (_, j) => (i === j ? 1 : 0))]);
+  for (let c = 0; c < p; c++) {
+    let piv = c;
+    for (let r = c + 1; r < p; r++) if (Math.abs(M[r]![c]!) > Math.abs(M[piv]![c]!)) piv = r;
+    [M[c], M[piv]] = [M[piv]!, M[c]!];
+    const d = M[c]![c]!;
+    for (let k = 0; k < 2 * p; k++) M[c]![k]! /= d;
+    for (let r = 0; r < p; r++) {
+      if (r === c) continue;
+      const f = M[r]![c]!;
+      for (let k = 0; k < 2 * p; k++) M[r]![k]! -= f * M[c]![k]!;
     }
   }
-  const clamp = (n: number): number => Math.min(model.multiple_cap, Math.max(model.multiple_floor, n));
-  const overall = clamp(median(all));
-  const multiples: Record<string, number> = {};
-  const counts: Record<string, number> = {};
-  for (const [category, ratios] of byCategory) {
-    counts[category] = ratios.length;
-    multiples[category] = ratios.length >= model.min_comps ? clamp(median(ratios)) : overall;
-  }
-  return { multiples, counts, overall };
+  const inv = M.map((row) => row.slice(p));
+  return fit.beta.map((_, j) => Math.sqrt(Math.max(0, s2 * inv[j]![j]!)));
 }
 
-/** The category multiple one protocol gets, and how many comps stood behind it. */
-export function multipleFor(
-  protocol: SnapshotProtocol,
-  comps: { multiples: Record<string, number>; counts: Record<string, number>; overall: number },
-): { multiple: number; comps: number } {
-  if (protocol.category !== null && protocol.category in comps.multiples) {
-    return { multiple: comps.multiples[protocol.category]!, comps: comps.counts[protocol.category] ?? 0 };
-  }
-  return { multiple: comps.overall, comps: 0 };
-}
-
-/** The multipliers and the implied value one protocol gets under `model`. */
+/** The multipliers and the implied value one protocol gets under the fitted log-log line. */
 export function impliedValue(
   protocol: SnapshotProtocol,
   asOf: string,
-  multiple: number,
-  model: ModelConstants = PRIOR_MODEL,
-): { implied: number; growthPct: number; growthMult: number; maturityMult: number; age: number | null } {
+  model: ModelConstants,
+): { implied: number; logTvl: number; fittedLogMcap: number; age: number | null } {
   const age = ageDays(asOf, protocol.listed_at);
-  // The multiple is stored rounded to four decimals, and the implied value is computed from that
-  // rounded figure, so the board, the dashboard data and the page's recompute all agree exactly.
-  const mult = Math.round(multiple * 1e4) / 1e4;
-  const rawGrowth = finite(protocol.change_7d, 0);
-  const growthPct = Math.min(model.growth_cap, Math.max(model.growth_floor, rawGrowth));
-  const growthMult = 1 + (growthPct / 100) * model.growth_weight;
-  const ageForModel = age ?? model.unknown_age_days;
-  const maturityMult = model.maturity_floor + (Math.min(Math.max(ageForModel, 0), model.maturity_days) / model.maturity_days) * model.maturity_range;
-  const implied = Math.max(1, Math.round(protocol.tvl_usd * mult * growthMult * maturityMult));
-  return { implied, growthPct, growthMult, maturityMult, age };
+  const logTvl = Math.log(protocol.tvl_usd);
+  const fittedLogMcap = model.intercept + model.slope * logTvl;
+  const implied = Math.max(1, Math.round(Math.exp(fittedLogMcap)));
+  return { implied, logTvl, fittedLogMcap, age };
 }
 
-/** Leave-one-out predictions for the fit set under `model`: implied vs actual market cap. */
-function looPredictions(
+/** Leave-one-out predictions for the fit set under one candidate: each protocol is scored by a fit that never saw it. */
+function looPredictionsFor(
   snapshot: Snapshot,
-  model: ModelConstants,
+  spec: CandidateSpec,
 ): { protocol: SnapshotProtocol; implied: number; actual: number }[] {
   const pool = fitSet(snapshot);
-  const comps = buildFitComps(pool);
-  return pool.map((p) => {
-    const { multiple } = looMultiple(p, comps, model);
-    const { implied } = impliedValue(p, snapshot.as_of, multiple, model);
-    return { protocol: p, implied, actual: p.mcap_usd! };
+  return pool.map((p, i) => {
+    const rest = pool.filter((_, j) => j !== i);
+    const fit = fitCandidate(rest, snapshot.as_of, spec);
+    return { protocol: p, implied: predictCandidate(fit, p, snapshot.as_of, spec), actual: p.mcap_usd! };
   });
+}
+
+/** Leave-one-out predictions for the fit set under the shipped pooled line. */
+function looPredictions(
+  snapshot: Snapshot,
+): { protocol: SnapshotProtocol; implied: number; actual: number }[] {
+  return looPredictionsFor(snapshot, CANDIDATES[0]!);
 }
 
 /** Error statistics for a list of (implied, actual) pairs. */
@@ -494,60 +521,73 @@ function errorStats(pairs: { implied: number; actual: number }[]): {
 }
 
 /**
- * The fit: grid-search growth weight, maturity floor and maturity range on leave-one-out
- * median absolute log error, then select within a 5% tie band the setting closest to the
- * radar-2 prior (growth 0.5, maturity floor 0.6, maturity range 0.4) — the objective is flat
- * in the growth weight, so chasing the argmin would chase noise. Returns the fitted constants.
+ * The fit: score all nine candidates by leave-one-out median absolute log error,
+ * then select the lowest; within a 5% tie band, take the fewest terms. The pooled
+ * line wins outright (1.223 vs 1.325 for the next-best candidate), so no tie
+ * rule fires. Returns the fitted line plus the candidate table and the
+ * coefficient standard errors that show why the rejected terms were rejected.
  */
-export function fitModel(snapshot: Snapshot): {
+export function fitRegression(snapshot: Snapshot): {
   model: ModelConstants;
-  grid: { growth_weight: number; maturity_floor: number; maturity_range: number; median_abs_log_error: number }[];
-  best: { growth_weight: number; maturity_floor: number; maturity_range: number; median_abs_log_error: number };
-  selected: { growth_weight: number; maturity_floor: number; maturity_range: number; median_abs_log_error: number };
+  candidates: { name: string; terms: number; median_abs_log_error: number; median_abs_pct_error: number; within_2x: number; within_2x_pct: number }[];
+  best: { name: string; median_abs_log_error: number };
+  selected: { name: string; median_abs_log_error: number };
+  regression: { intercept: number; slope: number; slope_se: number; intercept_se: number; growth_coef: number; growth_se: number; growth_t: number };
 } {
-  const grid: { growth_weight: number; maturity_floor: number; maturity_range: number; median_abs_log_error: number }[] = [];
-  for (const gw of FIT_GRID.growth_weights) {
-    for (const mf of FIT_GRID.maturity_floors) {
-      for (const mr of FIT_GRID.maturity_ranges) {
-        const trial: ModelConstants = { ...PRIOR_MODEL, growth_weight: gw, maturity_floor: mf, maturity_range: mr };
-        const stats = errorStats(looPredictions(snapshot, trial));
-        grid.push({ growth_weight: gw, maturity_floor: mf, maturity_range: mr, median_abs_log_error: stats.median_abs_log_error });
-      }
-    }
+  const table: { name: string; terms: number; median_abs_log_error: number; median_abs_pct_error: number; within_2x: number; within_2x_pct: number }[] = [];
+  for (const spec of CANDIDATES) {
+    const stats = errorStats(looPredictionsFor(snapshot, spec));
+    table.push({
+      name: spec.name,
+      terms: termCount(spec),
+      median_abs_log_error: stats.median_abs_log_error,
+      median_abs_pct_error: stats.median_abs_pct_error,
+      within_2x: stats.within_2x,
+      within_2x_pct: stats.within_2x_pct,
+    });
   }
-  const sorted = [...grid].sort((a, b) => a.median_abs_log_error - b.median_abs_log_error);
+  const sorted = [...table].sort((a, b) => a.median_abs_log_error - b.median_abs_log_error || a.terms - b.terms);
   const best = sorted[0]!;
-  const band = best.median_abs_log_error * (1 + FIT_GRID.tie_band);
-  const tied = grid.filter((g) => g.median_abs_log_error <= band);
-  const dist2 = (g: { growth_weight: number; maturity_floor: number; maturity_range: number }): number =>
-    (g.growth_weight - PRIOR_MODEL.growth_weight) ** 2 +
-    (g.maturity_floor - PRIOR_MODEL.maturity_floor) ** 2 +
-    (g.maturity_range - PRIOR_MODEL.maturity_range) ** 2;
-  tied.sort((a, b) => dist2(a) - dist2(b) || a.median_abs_log_error - b.median_abs_log_error);
+  const band = best.median_abs_log_error * 1.05;
+  const tied = table.filter((t) => t.median_abs_log_error <= band);
+  tied.sort((a, b) => a.terms - b.terms || a.median_abs_log_error - b.median_abs_log_error);
   const selected = tied[0]!;
-  const model: ModelConstants = {
-    ...PRIOR_MODEL,
-    growth_weight: selected.growth_weight,
-    maturity_floor: selected.maturity_floor,
-    maturity_range: selected.maturity_range,
+  const pool = fitSet(snapshot);
+  const pooled = fitCandidate(pool, snapshot.as_of, CANDIDATES[0]!);
+  const pooledSE = coefStandardErrors(pool, snapshot.as_of, CANDIDATES[0]!, pooled);
+  const growthSpec = CANDIDATES[5]!;
+  const growthFit = fitCandidate(pool, snapshot.as_of, growthSpec);
+  const growthSE = coefStandardErrors(pool, snapshot.as_of, growthSpec, growthFit);
+  const model: ModelConstants = { intercept: pooled.beta[0]!, slope: pooled.beta[1]! };
+  return {
+    model,
+    candidates: table,
+    best: { name: best.name, median_abs_log_error: best.median_abs_log_error },
+    selected: { name: selected.name, median_abs_log_error: selected.median_abs_log_error },
+    regression: {
+      intercept: model.intercept,
+      slope: model.slope,
+      slope_se: round4(pooledSE[1]!),
+      intercept_se: round4(pooledSE[0]!),
+      growth_coef: growthFit.beta[2]!,
+      growth_se: round4(growthSE[2]!),
+      growth_t: round4(growthFit.beta[2]! / growthSE[2]!),
+    },
   };
-  return { model, grid, best, selected };
 }
 
-/** A blind walk-forward test: fit multiples on protocols listed before `cutoff`, test after it. */
+/** A blind walk-forward test: fit the pooled line on protocols listed before `cutoff`, test after it. */
 function walkForward(
   snapshot: Snapshot,
-  model: ModelConstants,
   cutoff: string,
-): { cutoff: string; fit_n: number; test_n: number; excluded_null_listed: number; median_abs_pct_error: number; mean_abs_pct_error: number; within_2x: number; within_2x_pct: number } {
+): { cutoff: string; fit_n: number; test_n: number; excluded_null_listed: number; median_abs_pct_error: number; mean_abs_pct_error: number; median_abs_log_error: number; within_2x: number; within_2x_pct: number } {
   const pool = fitSet(snapshot);
   const fitPool = pool.filter((p) => p.listed_at !== null && p.listed_at < cutoff);
   const testPool = pool.filter((p) => p.listed_at !== null && p.listed_at >= cutoff);
   const excluded = pool.filter((p) => p.listed_at === null).length;
-  const comps = categoryMultiples(fitPool, model);
+  const fit = fitCandidate(fitPool, snapshot.as_of, CANDIDATES[0]!);
   const pairs = testPool.map((p) => {
-    const { multiple } = multipleFor(p, comps);
-    const { implied } = impliedValue(p, snapshot.as_of, multiple, model);
+    const implied = predictCandidate(fit, p, snapshot.as_of, CANDIDATES[0]!);
     return { implied, actual: p.mcap_usd! };
   });
   const stats = errorStats(pairs);
@@ -558,6 +598,7 @@ function walkForward(
     excluded_null_listed: excluded,
     median_abs_pct_error: stats.median_abs_pct_error,
     mean_abs_pct_error: stats.mean_abs_pct_error,
+    median_abs_log_error: stats.median_abs_log_error,
     within_2x: stats.within_2x,
     within_2x_pct: stats.within_2x_pct,
   };
@@ -635,14 +676,14 @@ export function issuanceFor(
 }
 
 /**
- * The whole validation: the grid search, leave-one-out errors, two blind walk-forward tests,
+ * The whole validation: the candidate table, leave-one-out errors, two blind walk-forward tests,
  * and the value-range factors from the leave-one-out error distribution.
  */
-export function validateModel(snapshot: Snapshot, model: ModelConstants, fit: ReturnType<typeof fitModel>): Validation {
-  const looPairs = looPredictions(snapshot, model);
+export function validateModel(snapshot: Snapshot, model: ModelConstants, fit: ReturnType<typeof fitRegression>): Validation {
+  const looPairs = looPredictions(snapshot);
   const loo = errorStats(looPairs);
-  const wf = walkForward(snapshot, model, '2025-01-01');
-  const wf24 = walkForward(snapshot, model, '2024-07-01');
+  const wf = walkForward(snapshot, '2025-01-01');
+  const wf24 = walkForward(snapshot, '2024-07-01');
   const low_factor = round3(quantile(loo.ratios_sorted, 0.25));
   const high_factor = round3(quantile(loo.ratios_sorted, 0.75));
   const cohorts = issuanceCohorts(snapshot);
@@ -654,17 +695,15 @@ export function validateModel(snapshot: Snapshot, model: ModelConstants, fit: Re
       usable_for_fit: fitSet(snapshot).length,
       excluded_mcap_le_zero: tokenizedWithMcap - fitSet(snapshot).length,
     },
-    grid: {
-      growth_weights: FIT_GRID.growth_weights,
-      maturity_floors: FIT_GRID.maturity_floors,
-      maturity_ranges: FIT_GRID.maturity_ranges,
-      tie_band: FIT_GRID.tie_band,
+    candidates: {
+      variants: [...fit.candidates].sort((a, b) => a.median_abs_log_error - b.median_abs_log_error),
+      tie_band: 0.05,
       best_median_abs_log_error: fit.best.median_abs_log_error,
-      best_params: { growth_weight: fit.best.growth_weight, maturity_floor: fit.best.maturity_floor, maturity_range: fit.best.maturity_range },
-      selected_params: { growth_weight: fit.selected.growth_weight, maturity_floor: fit.selected.maturity_floor, maturity_range: fit.selected.maturity_range },
+      best_name: fit.best.name,
+      selected_name: fit.selected.name,
       selection_rule:
-        'Grid-search leave-one-out median absolute log error over growth weight, maturity floor and maturity range; among settings within 5% of the best, take the one closest to the radar-2 prior (growth 0.5, maturity floor 0.6, maturity range 0.4), because the objective is flat in the growth weight.',
-      table: [...fit.grid].sort((a, b) => a.median_abs_log_error - b.median_abs_log_error),
+        'Score all nine candidates by leave-one-out median absolute log error over the 128 tokenized protocols with a usable market cap; select the lowest, and within a 5% tie band take the fewest terms. The pooled log-log line wins outright, so no tie rule fires.',
+      regression: fit.regression,
     },
     loo: {
       n: looPairs.length,
@@ -740,7 +779,6 @@ export function buildBoard(
   validation: Validation,
 ): BoardRow[] {
   const index = bySlug(snapshot.protocols);
-  const comps = categoryMultiples(snapshot.protocols, model);
   const cohorts = issuanceCohorts(snapshot);
   const chosen = new Map<string, SnapshotProtocol>();
   // The watchlist is the floor: every slug, even one the snapshot no longer carries (it cannot, but the
@@ -759,10 +797,9 @@ export function buildBoard(
   const lowFactor = validation.ranges.low_factor;
   const highFactor = validation.ranges.high_factor;
   const scored = [...chosen.values()].map((p) => {
-    const { multiple, comps: n } = multipleFor(p, comps);
-    const { implied, growthPct, growthMult, maturityMult, age } = impliedValue(p, snapshot.as_of, multiple, model);
+    const { implied, logTvl, fittedLogMcap, age } = impliedValue(p, snapshot.as_of, model);
     const { probability, cohort } = issuanceFor(p, snapshot.as_of, cohorts.cohorts);
-    return { p, implied, multiple, comps: n, growthPct, growthMult, maturityMult, age, probability, cohort };
+    return { p, implied, logTvl, fittedLogMcap, age, probability, cohort };
   });
   scored.sort((a, b) => b.implied - a.implied || (a.p.slug < b.p.slug ? -1 : a.p.slug > b.p.slug ? 1 : 0));
   // The gate needs every implied value distinct and non-increasing by rank. Whole-dollar rounding
@@ -800,11 +837,10 @@ export function buildBoard(
       issuance_cohort: s.cohort,
       expected_value_usd: Math.max(1, Math.round(s.implied * s.probability)),
       model: {
-        category_multiple: Math.round(s.multiple * 1e4) / 1e4,
-        category_comps: s.comps,
-        growth_pct: s.growthPct,
-        growth_multiplier: round4(s.growthMult),
-        maturity_multiplier: round4(s.maturityMult),
+        intercept: model.intercept,
+        slope: model.slope,
+        log_tvl: round4(s.logTvl),
+        fitted_log_mcap: s.fittedLogMcap,
         age_days: s.age,
       },
       farm_steps: farmSteps(s.p, s.age).map(stepText),
@@ -1041,23 +1077,20 @@ export function radarRow(row: BoardRow, watchlist: Set<string>): RadarRow {
     issuance_probability: row.issuance_probability,
     issuance_cohort: row.issuance_cohort,
     expected_value_usd: row.expected_value_usd,
-    multiple: row.model.category_multiple,
-    multiple_n: row.model.category_comps,
     watchlist: watchlist.has(row.slug),
-    growth_multiplier: row.model.growth_multiplier,
-    maturity_multiplier: row.model.maturity_multiplier,
+    log_tvl: row.model.log_tvl,
+    fitted_log_mcap: row.model.fitted_log_mcap,
   };
 }
 
 /** Everything the dashboard renders, from the snapshot. */
 export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: RadarData; validation: Validation } {
-  const fit = fitModel(snapshot);
+  const fit = fitRegression(snapshot);
   const model = fit.model;
   const validation = validateModel(snapshot, model, fit);
   const board = buildBoard(snapshot, model, validation);
   const live = liveRows(snapshot);
   const coverage = buildCoverage(snapshot, board);
-  const comps = categoryMultiples(snapshot.protocols, model);
   const early = board.filter((r) => !snapshot.watchlist.includes(r.slug)).length;
   const watchlist = new Set(snapshot.watchlist);
   const radar: RadarData = {
@@ -1070,8 +1103,6 @@ export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: Rada
     board_size: board.length,
     early_size: early,
     live_size: live.length,
-    overall_multiple: round4(comps.overall),
-    multiples: Object.fromEntries(Object.entries(comps.multiples).map(([k, v]) => [k, round4(v)])),
     rows: board.map((r) => radarRow(r, watchlist)),
     live,
     coverage,
