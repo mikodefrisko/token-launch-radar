@@ -1,4 +1,4 @@
-// A working token-radar-01 entry (Node 22, standard library only), model radar-4.
+// A working token-radar-01 entry (Node 22, standard library only), model radar-6.
 //
 // The program reads the sealed snapshot from /input/snapshot.json (or --input <file|dir>), scores every
 // pre-token protocol with the model in lib/model.ts, writes the ranked board to /output/board.json,
@@ -6,7 +6,7 @@
 // /output/validation.json, and copies this repository's dashboard/ and screenshots/ to /output.
 // Last, it writes /output/dossier.json, the summary the judge reads, with the vendored make.fun library.
 //
-// The radar-4 model fits its terms to the snapshot itself: a log-log TVL regression,
+// The radar-6 model fits its terms to the snapshot itself: a log-log TVL regression,
 // log(mcap) = intercept + slope x log(TVL), fitted by OLS over the tokenized protocols,
 // with nine candidate specifications scored by leave-one-out median absolute log error
 // (pooled line, category intercepts/slopes, log-age and growth terms and combinations);

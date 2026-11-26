@@ -34,7 +34,7 @@ Account: @golden-badger-44 · wallet `ApmXVZkSs74N5Z9hkSNMHA6abUbKyEoS5BNmhdAM6z
 - `screenshots/` — 3 real screenshots of the dashboard (board, detail, filtered).
 - `dossier.json` — built with the vendored `vendor/makefun-board.ts`.
 
-## The model (radar-5)
+## The model (radar-6)
 
 Implied value follows only from the snapshot's own figures — never from a
 hardcoded list of names — and its terms are FIT, not asserted. It is a pooled
@@ -45,17 +45,24 @@ log-log regression over the 128 tokenized protocols with a usable market cap
 - **Slope 0.5223 (OLS SE 0.0949, t = 5.51; the dashboard also shows the
   200-refit bootstrap standard error)**: a 10% higher TVL is associated with a ~5.2% higher market cap. The slope is far below 1.0,
   which is why the radar-3 category-median model (slope fixed at 1.0)
-  over-valued the biggest TVL protocols. Sixteen candidate specifications were
+  over-valued the biggest TVL protocols. Twenty-one candidate specifications were
   scored by leave-one-out median absolute log error — the pooled line, a TVL²
-  term, category ridge effects, log-age, 7-day-growth and chain-count terms,
-  combinations, median (LAD) and trimmed fits, and two negative controls — and
+  term, category ridge effects (λ=16/64/256), log-age, 7-day-growth and chain-count terms,
+  combinations, median (LAD) and trimmed fits, heavy-shrinkage re-tests of age
+  and growth, and two negative controls — and
   the pooled line wins the tie-break: the lowest-LOO spec (category ridge
   λ=64 + TVL², 1.215) is only 0.7% better, adds terms, and fails walk-forward
   2024 (×3.83 vs ×3.16), so it is not shipped. The growth term's coefficient
   is insignificant (−3.714 ± 2.299, t = −1.62) with the wrong sign, so it is
   not shipped either. The negative controls (a deterministic pseudo-random
   number, another row's growth) do not help — LOO ×3.55 and ×3.50 against
-  ×3.40 for the pooled line.
+  ×3.40 for the pooled line. A fourth search round (radar-6, 76 specifications
+  in total: segmented per-category fits, hinges/LOESS, Huber/quantile/Theil-Sen,
+  interactions, WLS, winsorising/clipping/shrinkage) found nothing that beats
+  the pooled line on LOO *and* both walk-forwards at once — the only formal
+  three-way win (WLS by TVL-band variance) is −0.01% LOO and −0.3% WF25, pure
+  noise. Full numbers: `VALIDATION-radar6.md` and
+  `~/workspace/makefun/radar6-model-search-results.md`.
 
 Blind tests, honestly: leave-one-out median absolute error **85.2%** (mean
 986% — a few huge misses dominate the mean), **41 of 128** predictions within
@@ -68,7 +75,7 @@ error 85.0% (×3.55, 40 of 128 within 2×); category-blind, 83.1% (×3.49, 36 of
 100 in categories with a hold-out). Against the flat median-multiple baseline
 the pooled line wins on every split (LOO ×3.40 vs ×5.07, WF25 ×3.08 vs ×5.35,
 WF24 ×3.16 vs ×5.03). Against radar-3 (LOO 92.2% / 25 of 128, WF25 82.9% /
-10 of 31, WF24 98.4% / 9 of 43), radar-5 wins on the symmetric log metric on
+10 of 31, WF24 98.4% / 9 of 43), radar-6 wins on the symmetric log metric on
 all three blind tests (1.223 vs 1.615; 1.124 vs 1.469; 1.151 vs 1.653) and on
 the % median on LOO and WF24, but **loses the WF25 % median** (89.2% vs
 82.9%) — driven by two large over-predictions in the 31-protocol test set.
@@ -81,7 +88,7 @@ implied value × 0.306 / × 4.194, the 25th and 75th percentiles of (actual
 mcap / leave-one-out implied) — the middle 50% of backtested outcomes.
 Realized coverage of that middle 50%: LOO 50.0%, WF25 54.8%, WF24 53.5%; of
 the wide 80% band (×0.063–×8.630): LOO 79.7%, WF25 74.2%, WF24 76.7%. Full
-numbers: `out/validation.json` and `VALIDATION-radar5.md`.
+numbers: `out/validation.json` and `VALIDATION-radar6.md`.
 
 **Issuance probability** is a 50/50 blend of a logistic fit (log TVL + log age
 + category ridge λ=4) and the cohort record share (age × TVL bucket, shrinkage
