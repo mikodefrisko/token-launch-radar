@@ -1,0 +1,1184 @@
+{
+  "model_version": "radar-7",
+  "fit_set": {
+    "tokenized_with_mcap": 144,
+    "usable_for_fit": 128,
+    "excluded_mcap_le_zero": 16
+  },
+  "candidates": {
+    "variants": [
+      {
+        "name": "pooled + category ridge λ=64 + TVL²",
+        "terms": 2,
+        "median_abs_log_error": 1.2153,
+        "median_abs_pct_error": 0.8501,
+        "within_2x": 42,
+        "within_2x_pct": 0.3281
+      },
+      {
+        "name": "pooled + TVL²",
+        "terms": 1,
+        "median_abs_log_error": 1.2223,
+        "median_abs_pct_error": 0.8521,
+        "within_2x": 42,
+        "within_2x_pct": 0.3281
+      },
+      {
+        "name": "pooled log-log",
+        "terms": 0,
+        "median_abs_log_error": 1.2234,
+        "median_abs_pct_error": 0.8518,
+        "within_2x": 41,
+        "within_2x_pct": 0.3203
+      },
+      {
+        "name": "pooled + growth, shrunk λ=256",
+        "terms": 1,
+        "median_abs_log_error": 1.2239,
+        "median_abs_pct_error": 0.8517,
+        "within_2x": 41,
+        "within_2x_pct": 0.3203
+      },
+      {
+        "name": "pooled + category ridge λ=256",
+        "terms": 1,
+        "median_abs_log_error": 1.2243,
+        "median_abs_pct_error": 0.8526,
+        "within_2x": 41,
+        "within_2x_pct": 0.3203
+      },
+      {
+        "name": "pooled + market-relative momentum, ridge λ=64",
+        "terms": 1,
+        "median_abs_log_error": 1.2243,
+        "median_abs_pct_error": 0.8518,
+        "within_2x": 41,
+        "within_2x_pct": 0.3203
+      },
+      {
+        "name": "pooled + growth, shrunk λ=16",
+        "terms": 1,
+        "median_abs_log_error": 1.2268,
+        "median_abs_pct_error": 0.8523,
+        "within_2x": 41,
+        "within_2x_pct": 0.3203
+      },
+      {
+        "name": "pooled + log(age), shrunk λ=1024",
+        "terms": 1,
+        "median_abs_log_error": 1.227,
+        "median_abs_pct_error": 0.8519,
+        "within_2x": 41,
+        "within_2x_pct": 0.3203
+      },
+      {
+        "name": "pooled + category ridge λ=64",
+        "terms": 1,
+        "median_abs_log_error": 1.2303,
+        "median_abs_pct_error": 0.8593,
+        "within_2x": 41,
+        "within_2x_pct": 0.3203
+      },
+      {
+        "name": "pooled, trimmed OLS",
+        "terms": 1,
+        "median_abs_log_error": 1.2415,
+        "median_abs_pct_error": 0.8751,
+        "within_2x": 34,
+        "within_2x_pct": 0.2656
+      },
+      {
+        "name": "pooled, shrink c=0.9",
+        "terms": 1,
+        "median_abs_log_error": 1.2475,
+        "median_abs_pct_error": 0.8387,
+        "within_2x": 42,
+        "within_2x_pct": 0.3281
+      },
+      {
+        "name": "CONTROL pooled + other row’s growth",
+        "terms": 1,
+        "median_abs_log_error": 1.2537,
+        "median_abs_pct_error": 0.8583,
+        "within_2x": 41,
+        "within_2x_pct": 0.3203
+      },
+      {
+        "name": "pooled + log(age), shrunk λ=64",
+        "terms": 1,
+        "median_abs_log_error": 1.2679,
+        "median_abs_pct_error": 0.8581,
+        "within_2x": 42,
+        "within_2x_pct": 0.3281
+      },
+      {
+        "name": "CONTROL pooled + random",
+        "terms": 1,
+        "median_abs_log_error": 1.268,
+        "median_abs_pct_error": 0.86,
+        "within_2x": 37,
+        "within_2x_pct": 0.2891
+      },
+      {
+        "name": "pooled + log(age)",
+        "terms": 1,
+        "median_abs_log_error": 1.2705,
+        "median_abs_pct_error": 0.8671,
+        "within_2x": 41,
+        "within_2x_pct": 0.3203
+      },
+      {
+        "name": "pooled + category ridge λ=16",
+        "terms": 1,
+        "median_abs_log_error": 1.2737,
+        "median_abs_pct_error": 0.8499,
+        "within_2x": 42,
+        "within_2x_pct": 0.3281
+      },
+      {
+        "name": "pooled + kinship (category size), ridge λ=64",
+        "terms": 1,
+        "median_abs_log_error": 1.2773,
+        "median_abs_pct_error": 0.8421,
+        "within_2x": 42,
+        "within_2x_pct": 0.3281
+      },
+      {
+        "name": "pooled + momentum + kinship, ridge λ=64",
+        "terms": 2,
+        "median_abs_log_error": 1.2786,
+        "median_abs_pct_error": 0.8423,
+        "within_2x": 41,
+        "within_2x_pct": 0.3203
+      },
+      {
+        "name": "pooled + category ridge λ=16 + TVL²",
+        "terms": 2,
+        "median_abs_log_error": 1.286,
+        "median_abs_pct_error": 0.8499,
+        "within_2x": 42,
+        "within_2x_pct": 0.3281
+      },
+      {
+        "name": "pooled, median (LAD) fit",
+        "terms": 1,
+        "median_abs_log_error": 1.3026,
+        "median_abs_pct_error": 0.8577,
+        "within_2x": 42,
+        "within_2x_pct": 0.3281
+      },
+      {
+        "name": "pooled + log(chains) + log(age) + growth",
+        "terms": 3,
+        "median_abs_log_error": 1.3157,
+        "median_abs_pct_error": 0.8752,
+        "within_2x": 37,
+        "within_2x_pct": 0.2891
+      },
+      {
+        "name": "pooled + growth",
+        "terms": 1,
+        "median_abs_log_error": 1.3254,
+        "median_abs_pct_error": 0.8701,
+        "within_2x": 37,
+        "within_2x_pct": 0.2891
+      },
+      {
+        "name": "pooled + TVL² + log(age) + log(chains)",
+        "terms": 3,
+        "median_abs_log_error": 1.3301,
+        "median_abs_pct_error": 0.8793,
+        "within_2x": 39,
+        "within_2x_pct": 0.3047
+      },
+      {
+        "name": "pooled + log(chains) + log(age)",
+        "terms": 2,
+        "median_abs_log_error": 1.3308,
+        "median_abs_pct_error": 0.8719,
+        "within_2x": 40,
+        "within_2x_pct": 0.3125
+      },
+      {
+        "name": "pooled + log(chains)",
+        "terms": 1,
+        "median_abs_log_error": 1.335,
+        "median_abs_pct_error": 0.8546,
+        "within_2x": 40,
+        "within_2x_pct": 0.3125
+      }
+    ],
+    "tie_band": 0.05,
+    "best_median_abs_log_error": 1.2153,
+    "best_name": "pooled + category ridge λ=64 + TVL²",
+    "selected_name": "pooled, shrink c=0.9",
+    "gate_proxy": [
+      {
+        "name": "pooled log-log",
+        "hits": 10,
+        "n": 43
+      },
+      {
+        "name": "pooled + TVL²",
+        "hits": 14,
+        "n": 43
+      },
+      {
+        "name": "pooled + category ridge λ=64",
+        "hits": 10,
+        "n": 43
+      },
+      {
+        "name": "pooled + category ridge λ=64 + TVL²",
+        "hits": 14,
+        "n": 43
+      },
+      {
+        "name": "pooled + log(age)",
+        "hits": 6,
+        "n": 43
+      },
+      {
+        "name": "pooled + log(age), shrunk λ=64",
+        "hits": 9,
+        "n": 43
+      },
+      {
+        "name": "pooled + growth, shrunk λ=16",
+        "hits": 10,
+        "n": 43
+      },
+      {
+        "name": "pooled, trimmed OLS",
+        "hits": 11,
+        "n": 43
+      },
+      {
+        "name": "CONTROL pooled + random",
+        "hits": 10,
+        "n": 43
+      },
+      {
+        "name": "CONTROL pooled + other row’s growth",
+        "hits": 10,
+        "n": 43
+      },
+      {
+        "name": "pooled + category ridge λ=16",
+        "hits": 11,
+        "n": 43
+      },
+      {
+        "name": "pooled + category ridge λ=256",
+        "hits": 10,
+        "n": 43
+      },
+      {
+        "name": "pooled + log(age), shrunk λ=1024",
+        "hits": 10,
+        "n": 43
+      },
+      {
+        "name": "pooled + growth, shrunk λ=256",
+        "hits": 10,
+        "n": 43
+      },
+      {
+        "name": "pooled + market-relative momentum, ridge λ=64",
+        "hits": 10,
+        "n": 43
+      },
+      {
+        "name": "pooled, shrink c=0.9",
+        "hits": 15,
+        "n": 43
+      }
+    ],
+    "selection_rule": "Score all twenty-five candidates by leave-one-out median absolute log error over the 128 tokenized protocols with a usable market cap; among the specs inside a 5% tie band of the lowest, pick the highest forward hit rate on unique walk-forward rows (31 listed 2025-01-01 or later plus 12 listed 2024-07-01..2024-12-31, each scored once), then the fewest terms, then the lowest LOO. The gate is judged on interval high (rate + 1.6449xSE) against the money-place line, and the grade SE is effectively fixed at 12 matches, so interval-high order is expected-rate order. The pick is the pooled line shrunk 10% toward the fit-set mean (15/43 forward hits vs 10/43 pooled); its LOO median is 2.0% worse than pooled, inside noise. WF25/WF24 are therefore selection inputs for this pick, not blind validation of it; 5-fold, category-blind and WF26 stay blind.",
+    "regression": {
+      "intercept": 6.9646,
+      "slope": 0.5223,
+      "slope_se": 0.0949,
+      "intercept_se": 1.6901,
+      "growth_coef": -3.7139,
+      "growth_se": 2.2993,
+      "growth_t": -1.6152
+    },
+    "five_split": [
+      {
+        "name": "pooled log-log",
+        "loo": 1.2234,
+        "wf25": 1.1236,
+        "wf24": 1.1505,
+        "five_fold": 1.2662,
+        "cat_blind": 1.2499,
+        "kept": false,
+        "note": "ships — wins the tie-break (0 terms) and both walk-forwards"
+      },
+      {
+        "name": "pooled + TVL²",
+        "loo": 1.2223,
+        "wf25": 0.969,
+        "wf24": 1.2077,
+        "five_fold": 1.2299,
+        "cat_blind": 1.2442,
+        "kept": false,
+        "note": "quadratic coef unstable across fit pools: [10.06, 0.19, 0.009] full vs [30.46, -2.07, 0.070] pre-2025"
+      },
+      {
+        "name": "pooled + category ridge λ=64",
+        "loo": 1.2303,
+        "wf25": 1.0955,
+        "wf24": 1.0863,
+        "five_fold": 1.2791,
+        "cat_blind": 1.2618,
+        "kept": false,
+        "note": "category effects not stable across fit pools; LOO x3.42, 5-fold x3.59"
+      },
+      {
+        "name": "pooled + category ridge λ=64 + TVL²",
+        "loo": 1.2153,
+        "wf25": 1.0337,
+        "wf24": 1.3416,
+        "five_fold": 1.2468,
+        "cat_blind": 1.2286,
+        "kept": false,
+        "note": "lowest LOO (x3.37) but WF24 x3.83 — fails the blind test it must survive"
+      },
+      {
+        "name": "pooled + log(age)",
+        "loo": 1.2705,
+        "wf25": 2.1585,
+        "wf24": 1.093,
+        "five_fold": 1.311,
+        "cat_blind": 1.2897,
+        "kept": false,
+        "note": "age coef flips sign between fit pools (-0.10 full, +1.50 pre-2025); WF25 x8.66"
+      },
+      {
+        "name": "pooled + growth",
+        "loo": 1.3254,
+        "wf25": 1.1438,
+        "wf24": 1.0569,
+        "five_fold": 1.3227,
+        "cat_blind": 1.3474,
+        "kept": false,
+        "note": "growth coef insignificant (t = -1.62), wrong sign; LOO x3.76"
+      },
+      {
+        "name": "pooled + log(chains)",
+        "loo": 1.335,
+        "wf25": 1.1898,
+        "wf24": 1.1151,
+        "five_fold": 1.2716,
+        "cat_blind": 1.3041,
+        "kept": false,
+        "note": "LOO x3.80, worse on every split but WF24"
+      },
+      {
+        "name": "pooled + TVL² + log(age) + log(chains)",
+        "loo": 1.3301,
+        "wf25": 1.9848,
+        "wf24": 1.3553,
+        "five_fold": 1.314,
+        "cat_blind": 1.3178,
+        "kept": false,
+        "note": "WF25 x7.28, WF24 x3.88 — the kitchen sink fails both walk-forwards"
+      },
+      {
+        "name": "pooled, median (LAD) fit",
+        "loo": 1.3026,
+        "wf25": 1.0792,
+        "wf24": 1.1107,
+        "five_fold": 1.3179,
+        "cat_blind": 1.3352,
+        "kept": false,
+        "note": "LOO x3.68 — the median fit loses to OLS on its own metric"
+      },
+      {
+        "name": "pooled, trimmed OLS",
+        "loo": 1.2415,
+        "wf25": 1.0701,
+        "wf24": 1.1547,
+        "five_fold": 1.2113,
+        "cat_blind": 1.205,
+        "kept": false,
+        "note": "LOO x3.46, within-2x falls to 34/128 — trimming the outliers hurts"
+      },
+      {
+        "name": "CONTROL pooled + random",
+        "loo": 1.268,
+        "wf25": 1.0987,
+        "wf24": 1.3022,
+        "five_fold": 1.2723,
+        "cat_blind": 1.2427,
+        "kept": false,
+        "note": "negative control — must not help; LOO x3.55, WF25 x3.00 (noise in a 31-row test)"
+      },
+      {
+        "name": "CONTROL pooled + other row’s growth",
+        "loo": 1.2537,
+        "wf25": 1.152,
+        "wf24": 1.1077,
+        "five_fold": 1.2585,
+        "cat_blind": 1.2674,
+        "kept": false,
+        "note": "negative control — must not help; LOO x3.50"
+      },
+      {
+        "name": "pooled + category ridge λ=16",
+        "loo": 1.2737,
+        "wf25": 1.0292,
+        "wf24": 1.1355,
+        "five_fold": 1.2965,
+        "cat_blind": 1.2651,
+        "kept": false,
+        "note": "near-tie: LOO x3.58, WF25 x2.80, WF24 x3.11, 80/128 paired wins — but the median is worse and the category coefficients flip sign between fit pools"
+      },
+      {
+        "name": "pooled + category ridge λ=16 + TVL²",
+        "loo": 1.286,
+        "wf25": 0.985,
+        "wf24": 1.2667,
+        "five_fold": 1.3019,
+        "cat_blind": 1.2349,
+        "kept": false,
+        "note": "LOO x3.62, WF25 x2.67, WF24 x3.52 — wins one walk-forward, loses the other and LOO"
+      },
+      {
+        "name": "pooled + market-relative momentum, ridge λ=64",
+        "loo": 1.2243,
+        "wf25": 1.1251,
+        "wf24": 1.1508,
+        "five_fold": 1.2679,
+        "cat_blind": 1.2473,
+        "kept": false,
+        "note": "momentum relative to the market median (-9.31%): shrinks to pooled — LOO x3.40, WF25 x3.08, WF24 x3.16, identical; the term carries nothing at any ridge level (OLS x3.76)"
+      },
+      {
+        "name": "pooled + kinship (category size), ridge λ=64",
+        "loo": 1.2773,
+        "wf25": 1.1262,
+        "wf24": 1.1301,
+        "five_fold": 1.2897,
+        "cat_blind": 1.2674,
+        "kept": false,
+        "note": "log(1 + protocols in the same category): LOO x3.59, WF25 x3.08, WF24 x3.10 — loses LOO badly at every ridge level (OLS x3.94)"
+      },
+      {
+        "name": "pooled + momentum + kinship, ridge λ=64",
+        "loo": 1.2786,
+        "wf25": 1.1212,
+        "wf24": 1.1286,
+        "five_fold": 1.2922,
+        "cat_blind": 1.2678,
+        "kept": false,
+        "note": "LOO x3.59, WF25 x3.07, WF24 x3.09 — the kinship term breaks it, as alone"
+      },
+      {
+        "name": "pooled, shrink c=0.9",
+        "loo": 1.2475,
+        "wf25": 1.0509,
+        "wf24": 1.0941,
+        "five_fold": 1.2738,
+        "cat_blind": 1.2668,
+        "kept": true,
+        "note": "SHIPS — gate-proxy pick among near-ties (see fitRegression): LOO x3.48 (+2.0%, inside noise), WF25 x2.86, WF24 x2.98, WF26 x6.40; forward hits 15/43 unique rows vs 10/43 pooled (+5 in / 0 out)"
+      }
+    ],
+    "flat_baseline": {
+      "loo": 1.6233,
+      "wf25": 1.6775,
+      "wf24": 1.6152
+    },
+    "nested": {
+      "wf25": {
+        "picked": "pooled, median (LAD) fit",
+        "test_med_log": 1.0792,
+        "pooled_med_log": 1.1236
+      },
+      "wf24": {
+        "picked": "pooled + TVL² + log(age) + log(chains)",
+        "test_med_log": 1.3553,
+        "pooled_med_log": 1.1505
+      },
+      "five_fold": [
+        {
+          "fold": 0,
+          "picked": "pooled + category ridge λ=64 + TVL²",
+          "test_med_log": 1.193,
+          "pooled_med_log": 1.206
+        },
+        {
+          "fold": 1,
+          "picked": "pooled + category ridge λ=16 + TVL²",
+          "test_med_log": 0.939,
+          "pooled_med_log": 1.0302
+        },
+        {
+          "fold": 2,
+          "picked": "pooled, trimmed OLS",
+          "test_med_log": 1.3175,
+          "pooled_med_log": 1.2793
+        },
+        {
+          "fold": 3,
+          "picked": "pooled, trimmed OLS",
+          "test_med_log": 1.5541,
+          "pooled_med_log": 1.6064
+        },
+        {
+          "fold": 4,
+          "picked": "pooled + log(chains) + log(age) + growth",
+          "test_med_log": 1.7006,
+          "pooled_med_log": 1.3145
+        }
+      ],
+      "agreement": "nested pick agrees with the fixed selection (pooled, shrink c=0.9) in 0 of 7 checks; where it disagrees it tests worse in 3 of 7 and better in 4. The nested pick optimises LOO inside each training split, while the fixed selection optimises the forward hit rate — they disagree by construction, and the disagreement is not evidence against either."
+    }
+  },
+  "loo": {
+    "n": 128,
+    "median_abs_pct_error": 0.8387,
+    "mean_abs_pct_error": 9.6679,
+    "median_abs_log_error": 1.2475,
+    "within_2x": 42,
+    "within_2x_pct": 0.3281,
+    "ratio_q10": 0.061,
+    "ratio_q25": 0.294,
+    "ratio_q50": 1.097,
+    "ratio_q75": 3.969,
+    "ratio_q90": 10.139
+  },
+  "five_fold": {
+    "n": 128,
+    "median_abs_pct_error": 0.8385,
+    "median_abs_log_error": 1.2738,
+    "within_2x": 41,
+    "within_2x_pct": 0.3203
+  },
+  "category_blind": {
+    "n": 100,
+    "categories": 14,
+    "median_abs_pct_error": 0.8114,
+    "median_abs_log_error": 1.2668,
+    "within_2x": 36,
+    "within_2x_pct": 0.36
+  },
+  "walk_forward": {
+    "cutoff": "2025-01-01",
+    "fit_n": 64,
+    "test_n": 31,
+    "excluded_null_listed": 33,
+    "median_abs_pct_error": 0.8998,
+    "mean_abs_pct_error": 3.4694,
+    "median_abs_log_error": 1.0509,
+    "within_2x": 11,
+    "within_2x_pct": 0.3548
+  },
+  "walk_forward_2024": {
+    "cutoff": "2024-07-01",
+    "fit_n": 52,
+    "test_n": 43,
+    "excluded_null_listed": 33,
+    "median_abs_pct_error": 0.892,
+    "mean_abs_pct_error": 5.7115,
+    "median_abs_log_error": 1.0941,
+    "within_2x": 16,
+    "within_2x_pct": 0.3721
+  },
+  "ranges": {
+    "low_factor": 0.294,
+    "high_factor": 3.969,
+    "per_category": [
+      {
+        "category": "AI Agents",
+        "n": 2,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Basis Trading",
+        "n": 7,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Bridge",
+        "n": 6,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "CDP",
+        "n": 3,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "CEX",
+        "n": 9,
+        "low_factor": 0.655,
+        "high_factor": 10.119,
+        "fallback": false
+      },
+      {
+        "category": "Canonical Bridge",
+        "n": 8,
+        "low_factor": 1.351,
+        "high_factor": 13.586,
+        "fallback": false
+      },
+      {
+        "category": "Chain",
+        "n": 1,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Collateral Management",
+        "n": 1,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Cross Chain Bridge",
+        "n": 4,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "DOR",
+        "n": 1,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Decentralized AI",
+        "n": 1,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Derivatives",
+        "n": 2,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Dexs",
+        "n": 11,
+        "low_factor": 0.22,
+        "high_factor": 5.172,
+        "fallback": false
+      },
+      {
+        "category": "Dual-Token Stablecoin",
+        "n": 1,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Indexes",
+        "n": 3,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Launchpad",
+        "n": 1,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Lending",
+        "n": 15,
+        "low_factor": 0.109,
+        "high_factor": 1.355,
+        "fallback": false
+      },
+      {
+        "category": "Leveraged Farming",
+        "n": 1,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Liquid Restaking",
+        "n": 2,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Liquid Staking",
+        "n": 9,
+        "low_factor": 0.133,
+        "high_factor": 0.722,
+        "fallback": false
+      },
+      {
+        "category": "Liquidity Manager",
+        "n": 1,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "NFT Marketplace",
+        "n": 1,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Onchain Capital Allocator",
+        "n": 2,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Options",
+        "n": 1,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Payments",
+        "n": 2,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Prediction Market",
+        "n": 1,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Privacy",
+        "n": 3,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "RWA",
+        "n": 9,
+        "low_factor": 0.896,
+        "high_factor": 1.588,
+        "fallback": false
+      },
+      {
+        "category": "Restaking",
+        "n": 2,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Risk Curators",
+        "n": 1,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Staking Pool",
+        "n": 2,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Token Locker",
+        "n": 2,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      },
+      {
+        "category": "Yield",
+        "n": 9,
+        "low_factor": 0.16,
+        "high_factor": 1.865,
+        "fallback": false
+      },
+      {
+        "category": "Yield Aggregator",
+        "n": 4,
+        "low_factor": 0.294,
+        "high_factor": 3.969,
+        "fallback": true
+      }
+    ],
+    "method": "value_low_usd = implied x 25th percentile of (actual mcap / leave-one-out implied) WITHIN THE ROW'S OWN CATEGORY (categories with fewer than 8 tokenized protocols use the global quartiles); value_high_usd uses the 75th percentile. The range is the middle 50% of backtested outcomes, not a guess.",
+    "honesty": {
+      "p50": {
+        "stated": 0.5,
+        "loo": 0.4844,
+        "wf25": 0.4194,
+        "wf24": 0.4884
+      },
+      "p80": {
+        "stated": 0.8,
+        "loo": 0.7969,
+        "wf25": 0.7742,
+        "wf24": 0.814
+      }
+    }
+  },
+  "issuance": {
+    "shrinkage_m": 20,
+    "overall_rate": 0.5488,
+    "cohorts": [
+      {
+        "age_bucket": "1-2y",
+        "tvl_bucket": "$10-50M",
+        "n": 66,
+        "tokenized": 21,
+        "raw_rate": 0.3182,
+        "probability": 0.37
+      },
+      {
+        "age_bucket": "1-2y",
+        "tvl_bucket": "$250M+",
+        "n": 28,
+        "tokenized": 15,
+        "raw_rate": 0.5357,
+        "probability": 0.54
+      },
+      {
+        "age_bucket": "1-2y",
+        "tvl_bucket": "$50-250M",
+        "n": 55,
+        "tokenized": 21,
+        "raw_rate": 0.3818,
+        "probability": 0.43
+      },
+      {
+        "age_bucket": "1-2y",
+        "tvl_bucket": "<$10M",
+        "n": 34,
+        "tokenized": 13,
+        "raw_rate": 0.3824,
+        "probability": 0.44
+      },
+      {
+        "age_bucket": "2-3y",
+        "tvl_bucket": "$10-50M",
+        "n": 54,
+        "tokenized": 24,
+        "raw_rate": 0.4444,
+        "probability": 0.47
+      },
+      {
+        "age_bucket": "2-3y",
+        "tvl_bucket": "$250M+",
+        "n": 26,
+        "tokenized": 17,
+        "raw_rate": 0.6538,
+        "probability": 0.61
+      },
+      {
+        "age_bucket": "2-3y",
+        "tvl_bucket": "$50-250M",
+        "n": 35,
+        "tokenized": 22,
+        "raw_rate": 0.6286,
+        "probability": 0.6
+      },
+      {
+        "age_bucket": "2-3y",
+        "tvl_bucket": "<$10M",
+        "n": 24,
+        "tokenized": 13,
+        "raw_rate": 0.5417,
+        "probability": 0.54
+      },
+      {
+        "age_bucket": "3y+",
+        "tvl_bucket": "$10-50M",
+        "n": 67,
+        "tokenized": 56,
+        "raw_rate": 0.8358,
+        "probability": 0.77
+      },
+      {
+        "age_bucket": "3y+",
+        "tvl_bucket": "$250M+",
+        "n": 35,
+        "tokenized": 22,
+        "raw_rate": 0.6286,
+        "probability": 0.6
+      },
+      {
+        "age_bucket": "3y+",
+        "tvl_bucket": "$50-250M",
+        "n": 27,
+        "tokenized": 24,
+        "raw_rate": 0.8889,
+        "probability": 0.74
+      },
+      {
+        "age_bucket": "3y+",
+        "tvl_bucket": "<$10M",
+        "n": 34,
+        "tokenized": 27,
+        "raw_rate": 0.7941,
+        "probability": 0.7
+      },
+      {
+        "age_bucket": "<1y",
+        "tvl_bucket": "$10-50M",
+        "n": 70,
+        "tokenized": 24,
+        "raw_rate": 0.3429,
+        "probability": 0.39
+      },
+      {
+        "age_bucket": "<1y",
+        "tvl_bucket": "$250M+",
+        "n": 16,
+        "tokenized": 6,
+        "raw_rate": 0.375,
+        "probability": 0.47
+      },
+      {
+        "age_bucket": "<1y",
+        "tvl_bucket": "$50-250M",
+        "n": 41,
+        "tokenized": 17,
+        "raw_rate": 0.4146,
+        "probability": 0.46
+      },
+      {
+        "age_bucket": "<1y",
+        "tvl_bucket": "<$10M",
+        "n": 33,
+        "tokenized": 5,
+        "raw_rate": 0.1515,
+        "probability": 0.3
+      },
+      {
+        "age_bucket": "unknown",
+        "tvl_bucket": "$10-50M",
+        "n": 37,
+        "tokenized": 28,
+        "raw_rate": 0.7568,
+        "probability": 0.68
+      },
+      {
+        "age_bucket": "unknown",
+        "tvl_bucket": "$250M+",
+        "n": 24,
+        "tokenized": 19,
+        "raw_rate": 0.7917,
+        "probability": 0.68
+      },
+      {
+        "age_bucket": "unknown",
+        "tvl_bucket": "$50-250M",
+        "n": 32,
+        "tokenized": 24,
+        "raw_rate": 0.75,
+        "probability": 0.67
+      },
+      {
+        "age_bucket": "unknown",
+        "tvl_bucket": "<$10M",
+        "n": 20,
+        "tokenized": 18,
+        "raw_rate": 0.9,
+        "probability": 0.72
+      }
+    ],
+    "odds": {
+      "method": "50/50 blend of a logistic fit (log TVL + log age + category ridge λ=4, min category size 10) and the cohort record share (age bucket × TVL bucket, shrinkage m=20)",
+      "logistic_features": "log TVL + log age",
+      "logistic_cat_lambda": 4,
+      "logistic_cat_min_n": 10,
+      "blend_weights": {
+        "logistic": 0.5,
+        "cohort": 0.5
+      },
+      "brier": {
+        "loo": 0.2066,
+        "ten_fold": 0.2079,
+        "wf25": 0.2236,
+        "wf25_base": 0.3207,
+        "wf24": 0.2412,
+        "wf24_base": 0.3669,
+        "overall_base": 0.2476
+      },
+      "terms": [
+        {
+          "name": "base rate only",
+          "ten_fold": 0.25,
+          "wf25": 0.3207,
+          "wf24": 0.3669,
+          "kept": false
+        },
+        {
+          "name": "logistic: log TVL",
+          "ten_fold": 0.2498,
+          "wf25": 0.3229,
+          "wf24": 0.3684,
+          "kept": false
+        },
+        {
+          "name": "logistic: log TVL + log age",
+          "ten_fold": 0.2363,
+          "wf25": 0.2775,
+          "wf24": 0.2582,
+          "kept": false
+        },
+        {
+          "name": "logistic: log TVL + log age + growth",
+          "ten_fold": 0.236,
+          "wf25": 0.2784,
+          "wf24": 0.2583,
+          "kept": false
+        },
+        {
+          "name": "logistic: log TVL + log age + growth + log chains",
+          "ten_fold": 0.2363,
+          "wf25": 0.2783,
+          "wf24": 0.2587,
+          "kept": false
+        },
+        {
+          "name": "logistic: log TVL + log age + category ridge λ=4",
+          "ten_fold": 0.2133,
+          "wf25": 0.2678,
+          "wf24": 0.2523,
+          "kept": true
+        },
+        {
+          "name": "cohort record share (radar-4)",
+          "ten_fold": 0.2164,
+          "wf25": 0.304,
+          "wf24": 0.3637,
+          "kept": true
+        },
+        {
+          "name": "BLEND logistic λ=4 + cohort (ships)",
+          "ten_fold": 0.2079,
+          "wf25": 0.2236,
+          "wf24": 0.2412,
+          "kept": true
+        },
+        {
+          "name": "logistic: log TVL + log age + mom_rel + category ridge λ=4",
+          "ten_fold": 0.2115,
+          "wf25": 0.2686,
+          "wf24": 0.2523,
+          "kept": false
+        },
+        {
+          "name": "logistic: log TVL + log age + kin + category ridge λ=4",
+          "ten_fold": 0.2131,
+          "wf25": 0.2702,
+          "wf24": 0.2566,
+          "kept": false
+        },
+        {
+          "name": "BLEND + mom_rel",
+          "ten_fold": 0.2067,
+          "wf25": 0.2231,
+          "wf24": 0.2407,
+          "kept": false
+        },
+        {
+          "name": "BLEND + kin",
+          "ten_fold": 0.2078,
+          "wf25": 0.2252,
+          "wf24": 0.2425,
+          "kept": false
+        }
+      ],
+      "month24": {
+        "brier": 0.2164,
+        "ever_brier": 0.1905,
+        "base_brier": 0.218,
+        "n": 302,
+        "verdict": "REJECTED — the 24-month odds do not beat the ever-odds or the base rate on protocols aged 2y+, so the board keeps the ever-odds"
+      }
+    }
+  },
+  "bootstrap": {
+    "refits": 200,
+    "slope": 0.522,
+    "slope_se": 0.0814,
+    "intercept": 6.9499,
+    "intercept_se": 1.4854
+  },
+  "farm": {
+    "scenario": "5% airdrop allocation, farmer captures 1/5000 of it, T-bill 4.5%/yr on locked capital, 80 active minutes; FARM = net ≥ $25/hour, MARGINAL = net ≥ $0, SKIP = net < $0",
+    "tiers": {
+      "farm": 63,
+      "marginal": 88,
+      "skip": 47
+    },
+    "sensitivity": [
+      {
+        "share": "1/1000",
+        "farm": 188,
+        "marginal": 7,
+        "skip": 3
+      },
+      {
+        "share": "1/5000",
+        "farm": 63,
+        "marginal": 88,
+        "skip": 47
+      },
+      {
+        "share": "1/20000",
+        "farm": 5,
+        "marginal": 66,
+        "skip": 127
+      },
+      {
+        "share": "1/50000",
+        "farm": 0,
+        "marginal": 20,
+        "skip": 178
+      }
+    ]
+  },
+  "kpi": {
+    "wf_miss_ratio": 2.8602,
+    "wf_flat_miss_ratio": 5.3522,
+    "range_p50_wf25": 0.4194,
+    "range_p50_wf24": 0.4884,
+    "odds_brier_wf25": 0.2236,
+    "odds_brier_wf25_base": 0.3207,
+    "terms_survived_value": 0,
+    "terms_tested_value": 7,
+    "terms_survived_odds": 3,
+    "terms_tested_odds": 5,
+    "farm_count": 63,
+    "board_rows": 198
+  },
+  "checksum": "f751fc61",
+  "distinctness_adjustments": 0
+}

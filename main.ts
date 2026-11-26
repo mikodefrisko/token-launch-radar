@@ -1,4 +1,4 @@
-// A working token-radar-01 entry (Node 22, standard library only), model radar-6.
+// A working token-radar-01 entry (Node 22, standard library only), model radar-7.
 //
 // The program reads the sealed snapshot from /input/snapshot.json (or --input <file|dir>), scores every
 // pre-token protocol with the model in lib/model.ts, writes the ranked board to /output/board.json,
@@ -6,12 +6,12 @@
 // /output/validation.json, and copies this repository's dashboard/ and screenshots/ to /output.
 // Last, it writes /output/dossier.json, the summary the judge reads, with the vendored make.fun library.
 //
-// The radar-6 model fits its terms to the snapshot itself: a log-log TVL regression,
+// The radar-7 model fits its terms to the snapshot itself: a log-log TVL regression,
 // log(mcap) = intercept + slope x log(TVL), fitted by OLS over the tokenized protocols,
-// with nine candidate specifications scored by leave-one-out median absolute log error
-// (pooled line, category intercepts/slopes, log-age and growth terms and combinations);
-// the pooled line wins outright. The value range comes from the leave-one-out error
-// distribution; issuance probability is the shrunk token-record share of the protocol's
+// with predictions shrunk 10% toward the fit-set mean log market cap (c = 0.9) —
+// the shrink is the gate-proxy pick among the near-ties (see lib/model.ts fitRegression).
+// The value range comes from the leave-one-out error distribution, per category;
+// issuance probability is the shrunk token-record share of the protocol's
 // age x TVL cohort. The board ranks every pre-token protocol the house's watchlist rule
 // keeps (198 rows) and accounts for all 758 protocols.
 //

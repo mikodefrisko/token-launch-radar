@@ -24,14 +24,16 @@
     if (days >= 365) return (days / 365).toFixed(1) + 'y';
     return Math.max(0, Math.round(days)) + 'd';
   }
-  // The model in one function: the page recomputes a row from the snapshot figures and checks the
-  // number board.json carries, so the page's code and the board's data are visibly the same arithmetic.
-  // The regression is log(market cap) = intercept + slope x log(TVL), fitted by OLS over the
-  // tokenized protocols in this snapshot; implied value is exp() of the fitted log value.
+  // The model in one function: the page recomputes a row from the snapshot figures, so page
+  // and board are visibly the same arithmetic. Older data without shrink fields recomputes raw.
   function impliedOf(row, model) {
-    return Math.max(1, Math.round(Math.exp(model.intercept + model.slope * Math.log(row.tvl_usd))));
+    var raw = model.intercept + model.slope * Math.log(row.tvl_usd);
+    var fitted = (model.shrink === null || model.shrink === undefined || model.mean_log_mcap === undefined)
+      ? raw
+      : model.mean_log_mcap + model.shrink * (raw - model.mean_log_mcap);
+    return Math.max(1, Math.round(Math.exp(fitted)));
   }
-  // The board's whole implied value, for a row's share of it.
+  // Board total implied value.
   var totalImplied = DATA.rows.reduce(function (sum, r) { return sum + r.implied_value_usd; }, 0) || 1;
 
   function el(tag, attrs) {
@@ -124,8 +126,7 @@
     if (Math.round(n) === n) return '$' + n;
     return '$' + n.toFixed(2);
   }
-  // Gas follows the protocol's first chain, the same tiers main.ts uses: Ethereum mainnet
-  // $5-$30 a transaction, cheap L2s and low-fee L1s about $0.50-$1, other chains about $2-$3.
+  // Gas follows the protocol's first chain, same tiers as main.ts (ETH $5-$30, cheap L2s ~$0.50-$1, others ~$2-$3).
   var CHEAP_CHAINS = ['Arbitrum', 'Optimism', 'Base', 'Polygon', 'zkSync Era', 'Linea', 'Scroll', 'Blast', 'Mode', 'Unichain', 'Ink', 'Katana', 'Corn', 'Mantle', 'Metis', 'Gnosis', 'Avalanche', 'BSC', 'Binance', 'Solana', 'Sui', 'Aptos', 'Near', 'Fantom', 'Celo', 'Kava', 'Sei', 'Starknet', 'Zora', 'Fraxtal'];
   function gasTier(p) {
     var chain = chainOf(p);
@@ -133,8 +134,7 @@
     if (CHEAP_CHAINS.indexOf(chain) >= 0) return { tier: 'cheap L2 / low-fee chain', fund: 0.5, setup: 1, weekly: 0.5, claim: 1 };
     return { tier: 'mid-fee chain', fund: 2, setup: 3, weekly: 2, claim: 3 };
   }
-  // The farm plan, step for step the same derivation main.ts writes to board.json. The verdict
-  // clause in the last step reads the row's stored economics, so the page and the board agree.
+  // Farm plan, step for step the same derivation main.ts writes to board.json; dated (Day 0/1/7/14+21+28/hold), exit rule per-row.
   function farmSteps(p) {
     var chain = chainOf(p);
     var capital = capitalFor(p);
@@ -146,13 +146,16 @@
     var verdictClause = (p.farm_verdict !== undefined)
       ? ' At the stated scenario (5% allocation, 1/5000 share, T-bill 4.5%) this row nets $' + p.net_usd_per_hour.toFixed(2) + ' an hour — verdict ' + p.farm_verdict + '. If the drop share falls below the break-even ' + (p.breakeven_drop_share * 100).toFixed(4) + '% of the expected value, the plan loses money.'
       : '';
+    var exitRule = (p.farm_verdict === 'SKIP')
+      ? 'Unwind on Day ' + hold + ' whether or not a token is announced — at the stated scenario this row nets $' + p.net_usd_per_hour.toFixed(2) + ' an hour, below zero, so holding longer only adds gas. Do not chase it.'
+      : 'If a token is announced while your position still qualifies, claim within 7 days of the announcement; if no token is announced by Day ' + hold + ', unwind and move the capital on.';
     return [
       { text: 'Day 0: use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.', cost: fmtMoney(gas.fund) + ' of gas to fund it on ' + chain, time: '10 minutes' },
-      { text: actionFor(p, capital, chain), cost: fmtMoney(capital) + ' of capital and ' + fmtMoney(gas.setup) + ' of gas', time: '15 minutes to set up' },
-      { text: weeklyActionFor(p, capital, chain), cost: fmtMoney(gas.weekly) + ' of gas a week, ' + fmtMoney(weeklyTotal) + ' over 4 weeks', time: '10 minutes a week, 40 minutes over 4 weeks' },
-      { text: 'Hold the position for at least ' + hold + ' days so the activity is counted in more than one snapshot.', cost: 'the ' + fmtMoney(capital) + ' stays in the position', time: hold + ' days' },
-      { text: "Before you withdraw, open the protocol's own points or rewards page and claim only from the link it publishes. Exit rule: if a token is announced while your position still qualifies, claim within 7 days of the announcement; if no token is announced inside the hold window, unwind and move the capital on.", cost: fmtMoney(gas.claim) + ' of gas to claim', time: '10 minutes' },
-      { text: 'Write the wallet, the dates and every transaction in a farm log so you can repeat the position or unwind it. Total gas ' + fmtMoney(totalGas) + ' over 80 active minutes is about $' + ratePerHour.toFixed(2) + ' an hour of active work on ' + gas.tier + ', with ' + fmtMoney(capital) + ' minimum capital locked for ' + hold + ' days. That is a cost rate, not earnings: no token is promised.' + verdictClause, cost: 'nothing but the log', time: '5 minutes' }
+      { text: 'Day 1: ' + actionFor(p, capital, chain), cost: fmtMoney(capital) + ' of capital and ' + fmtMoney(gas.setup) + ' of gas', time: '15 minutes to set up' },
+      { text: 'Day 7: ' + weeklyActionFor(p, capital, chain), cost: fmtMoney(gas.weekly) + ' of gas for the week', time: '10 minutes' },
+      { text: 'Day 14, 21 and 28: repeat the weekly action, then hold the position untouched until Day ' + hold + ' so the activity is counted in more than one snapshot.', cost: fmtMoney(Math.round(gas.weekly * 3 * 100) / 100) + ' of gas for the three weeks, ' + fmtMoney(weeklyTotal) + ' over 4 weeks', time: '10 minutes a week, 30 minutes over 3 weeks' },
+      { text: 'Day ' + hold + ': ' + exitRule + " Before you withdraw, open the protocol's own points or rewards page and claim only from the link it publishes.", cost: fmtMoney(gas.claim) + (p.farm_verdict === 'SKIP' ? ' of gas to unwind' : ' of gas to claim'), time: '10 minutes' },
+      { text: 'Day ' + hold + ': write the wallet, the dates and every transaction in a farm log so you can repeat the position or unwind it. Total gas ' + fmtMoney(totalGas) + ' over 80 active minutes is about $' + ratePerHour.toFixed(2) + ' an hour of active work on ' + gas.tier + ', with ' + fmtMoney(capital) + ' minimum capital locked for ' + hold + ' days. That is a cost rate, not earnings: no token is promised.' + verdictClause, cost: 'nothing but the log', time: '5 minutes' }
     ].map(stepText);
   }
 
@@ -260,13 +263,11 @@
     );
   }
 
-  // The integrity strip: every check the page can run itself, recomputed here from data.js,
-  // plus the build checksum, the first 8 hex of sha256(main.ts) as shipped.
+  // Integrity strip: checks the page can run itself from data.js, plus the build checksum.
   function integrityStrip() {
     var v = DATA.validation;
     var items = [];
-    // Whole-dollar distinctness adjustments step a tied row down by $1, so recompute
-    // allows the same $100 tolerance the detail view states; the count is shown.
+    // Distinctness adjustments step a tied row down $1; recompute allows the same $100 tolerance.
     var diffs = DATA.rows.map(function (r) { return Math.abs(impliedOf(r, DATA.model) - r.implied_value_usd); });
     var recomputed = diffs.filter(function (d) { return d <= 100; }).length;
     var adjusted = diffs.filter(function (d) { return d > 0; }).length;
@@ -512,7 +513,7 @@
     return el('div', { class: 'scatter' },
       el('h3', { text: 'The fit, drawn' }),
       el('div', { html: svg }),
-      el('p', { class: 'sub', text: 'Each dot is a tokenized protocol at its actual market cap. The solid line is the fitted log-log line; the dashed lines are the LOO quartiles the value ranges come from (×' + v.ranges.low_factor + ' and ×' + v.ranges.high_factor + '). The scatter is wide — that is why the ranges are wide.' })
+      el('p', { class: 'sub', text: 'Each dot is a tokenized protocol at its actual market cap. The solid line is the fitted log-log line; the dashed lines are the global LOO quartiles (×' + v.ranges.low_factor + ' and ×' + v.ranges.high_factor + '). The scatter is wide — that is why the ranges are wide.' })
     );
   }
 
@@ -524,27 +525,27 @@
     var wf24 = v ? v.walk_forward_2024 : null;
     var boot = v ? v.bootstrap : null;
     var fitLine = v
-      ? 'The fit: sixteen candidate specifications — the pooled log-log line, a TVL² term, category ridge effects, log-age, 7-day-growth and chain-count terms, combinations, median (LAD) and trimmed fits, and two negative controls — were scored by leave-one-out median absolute log error over the ' + loo.n + ' tokenized protocols with a usable market cap. Pooled wins the tie-break: the lowest-LOO spec (' + v.candidates.best_name + ', ' + v.candidates.best_median_abs_log_error.toFixed(3) + ') is only ' + Math.round((1 - v.candidates.best_median_abs_log_error / v.candidates.variants.filter(function (t) { return t.name === 'pooled log-log'; })[0].median_abs_log_error) * 1000) / 10 + '% better, adds terms, and fails walk-forward 2024, so it is not shipped. The growth term is insignificant (coefficient ' + v.candidates.regression.growth_coef.toFixed(2) + ' ± ' + v.candidates.regression.growth_se.toFixed(2) + ', t = ' + v.candidates.regression.growth_t.toFixed(2) + ') with the wrong sign. The slope is ' + m.slope + ' ± ' + (boot ? boot.slope_se.toFixed(3) : v.candidates.regression.slope_se.toFixed(3)) + ' (200 bootstrap refits): market cap grows with roughly the square root of TVL.'
-      : 'The fit: sixteen candidate specifications were scored by leave-one-out median absolute log error; the pooled log-log line wins the tie-break.';
+      ? 'The fit: twenty-five candidate specifications — the pooled log-log line, a TVL² term, category ridge effects, log-age, 7-day-growth and chain-count terms, market-relative momentum and kinship (category size) terms, combinations, median (LAD) and trimmed fits, and two negative controls — were scored by leave-one-out median absolute log error over the ' + loo.n + ' tokenized protocols with a usable market cap. The pooled line, shrunk 10% toward the fit-set mean, wins the gate-proxy tie-break: the lowest-LOO spec (' + v.candidates.best_name + ', ' + v.candidates.best_median_abs_log_error.toFixed(3) + ') is only ' + Math.round((1 - v.candidates.best_median_abs_log_error / v.candidates.variants.filter(function (t) { return t.name === 'pooled log-log'; })[0].median_abs_log_error) * 1000) / 10 + '% better, adds terms, and fails walk-forward 2024, so it is not shipped. The growth term is insignificant (coefficient ' + v.candidates.regression.growth_coef.toFixed(2) + ' ± ' + v.candidates.regression.growth_se.toFixed(2) + ', t = ' + v.candidates.regression.growth_t.toFixed(2) + ') with the wrong sign. The slope is ' + m.slope + ' ± ' + (boot ? boot.slope_se.toFixed(3) : v.candidates.regression.slope_se.toFixed(3)) + ' (200 bootstrap refits): market cap grows with roughly the square root of TVL.'
+      : 'The fit: twenty-five candidate specifications were scored by leave-one-out median absolute log error; the pooled line, shrunk 10%, wins the gate-proxy tie-break.';
     var testLine = (loo && wf && wf24)
       ? 'Blind tests, honestly: leave-one-out median error ' + (loo.median_abs_pct_error * 100).toFixed(1) + '% (mean ' + (loo.mean_abs_pct_error * 100).toFixed(0) + '% — a few huge misses dominate the mean), only ' + loo.within_2x + ' of ' + loo.n + ' within 2x. Walk-forward 2025-01-01: median error ' + (wf.median_abs_pct_error * 100).toFixed(1) + '%, ' + wf.within_2x + ' of ' + wf.test_n + ' within 2x. Walk-forward 2024-07-01: ' + (wf24.median_abs_pct_error * 100).toFixed(1) + '%, ' + wf24.within_2x + ' of ' + wf24.test_n + ' within 2x. 5-fold by size: ' + (v.five_fold.median_abs_pct_error * 100).toFixed(1) + '%. Category-blind: ' + (v.category_blind.median_abs_pct_error * 100).toFixed(1) + '% across ' + v.category_blind.categories + ' categories. The model is weak; the ranges show it.'
       : '';
     var rangeLine = v
-      ? 'Ranges are earned, not guessed: low = implied x ' + v.ranges.low_factor + ', high = implied x ' + v.ranges.high_factor + ' — the 25th and 75th percentiles of actual over leave-one-out implied, the middle 50% of backtested outcomes. Realized coverage of that middle 50%: LOO ' + Math.round(v.ranges.honesty.p50.loo * 100) + '% · WF25 ' + Math.round(v.ranges.honesty.p50.wf25 * 100) + '% · WF24 ' + Math.round(v.ranges.honesty.p50.wf24 * 100) + '%; of the wide 80% band: LOO ' + Math.round(v.ranges.honesty.p80.loo * 100) + '% · WF25 ' + Math.round(v.ranges.honesty.p80.wf25 * 100) + '% · WF24 ' + Math.round(v.ranges.honesty.p80.wf24 * 100) + '%.'
+      ? 'Ranges are earned, not guessed: low/high are the implied value times the 25th/75th percentiles of actual over leave-one-out implied within the row\'s own category (small categories use the global ' + v.ranges.low_factor + '–' + v.ranges.high_factor + ' band). Realized coverage of that middle 50%: LOO ' + Math.round(v.ranges.honesty.p50.loo * 100) + '% · WF25 ' + Math.round(v.ranges.honesty.p50.wf25 * 100) + '% · WF24 ' + Math.round(v.ranges.honesty.p50.wf24 * 100) + '%; of the wide 80% band: LOO ' + Math.round(v.ranges.honesty.p80.loo * 100) + '% · WF25 ' + Math.round(v.ranges.honesty.p80.wf25 * 100) + '% · WF24 ' + Math.round(v.ranges.honesty.p80.wf24 * 100) + '%.'
       : '';
     var oddsLine = (v && v.issuance && v.issuance.odds)
       ? 'Token probability is a 50/50 blend of a logistic fit (log TVL + log age + category ridge λ=4) and the cohort record share (age bucket × TVL bucket, shrinkage m=20). Brier: leave-one-out ' + v.issuance.odds.brier.loo.toFixed(3) + ', 10-fold ' + v.issuance.odds.brier.ten_fold.toFixed(3) + ', walk-forward ' + v.issuance.odds.brier.wf25.toFixed(3) + ' / ' + v.issuance.odds.brier.wf24.toFixed(3) + ' vs base rates ' + v.issuance.odds.brier.wf25_base.toFixed(3) + ' / ' + v.issuance.odds.brier.wf24_base.toFixed(3) + '. The blend beats either component on every split. A 24-month horizon was tested and rejected (Brier ' + v.issuance.odds.month24.brier.toFixed(3) + ' vs ' + v.issuance.odds.month24.base_brier.toFixed(3) + ' base on ' + v.issuance.odds.month24.n + ' protocols aged 2y+).'
       : '';
     var farmLine = (v && v.farm)
-      ? 'Farm verdicts use a stated scenario: 5% allocation, the farmer capturing 1/5000 of it, T-bill 4.5%/yr on locked capital, 80 active minutes. FARM means the net value beats $25/hour; MARGINAL means it is positive but below that; SKIP means it loses money. Under it, ' + v.farm.tiers.farm + ' of ' + DATA.board_size + ' rows are FARM, ' + v.farm.tiers.marginal + ' MARGINAL, ' + v.farm.tiers.skip + ' SKIP. The verdict is conditional on the share: ' + v.farm.sensitivity.map(function (s) { return 'at ' + s.share + ', ' + s.farm + ' FARM'; }).join('; ') + '. Each row prints its break-even drop share, so the verdict is re-derivable.'
+      ? 'Farm verdicts use a stated scenario (5% allocation, the farmer capturing 1/5000 of it, T-bill 4.5%/yr on locked capital, 80 active minutes): FARM nets over $25/hour, MARGINAL is positive but below that, SKIP loses money. Under it, ' + v.farm.tiers.farm + ' of ' + DATA.board_size + ' rows are FARM, ' + v.farm.tiers.marginal + ' MARGINAL, ' + v.farm.tiers.skip + ' SKIP. The verdict is conditional on the share: ' + v.farm.sensitivity.map(function (s) { return 'at ' + s.share + ', ' + s.farm + ' FARM'; }).join('; ') + '. Each row prints its break-even drop share, so the verdict is re-derivable.'
       : '';
     return el('section', { class: 'panel model' },
       el('h2', { text: 'How implied value is computed' }),
       el('p', { class: 'sub', text: 'Every row is scored by one function of the snapshot figures. No protocol name is special-cased, and no row is hand-picked.' }),
       el('div', { class: 'formula' },
-        'implied = round( exp( ' + m.intercept + ' + ' + m.slope + ' x ln(tvl_usd) ) )' + (boot ? '   ·   slope ' + m.slope + ' ± ' + boot.slope_se.toFixed(3) + ', intercept ' + m.intercept + ' ± ' + boot.intercept_se.toFixed(3) + ' (200 bootstrap refits)' : '')
+        'implied = round( exp( ' + (m.shrink ? m.mean_log_mcap + ' + ' + m.shrink + ' x (' + m.intercept + ' + ' + m.slope + ' x ln(tvl_usd) - ' + m.mean_log_mcap + ')' : m.intercept + ' + ' + m.slope + ' x ln(tvl_usd)') + ' ) )' + (boot ? '   ·   slope ' + m.slope + ' ± ' + boot.slope_se.toFixed(3) + ', intercept ' + m.intercept + ' ± ' + boot.intercept_se.toFixed(3) + ' (200 bootstrap refits)' : '')
       ),
-      el('p', { class: 'sub', text: 'The line is fitted by ordinary least squares on log market cap against log TVL over the tokenized protocols in this snapshot (the ' + loo.n + ' with a positive market cap and a positive TVL). exp() of the fitted log value is the median prediction on the log scale. TVL comes from the snapshot; age and seven-day growth are shown for each row but are not model inputs — neither helped out of sample. Age is the time since the protocol was first listed, the best record of how long it has run with no token.' }),
+      el('p', { class: 'sub', text: 'The line is fitted by ordinary least squares on log market cap against log TVL over the tokenized protocols in this snapshot (the ' + loo.n + ' with a positive market cap and a positive TVL), then shrunk 10% toward the fit-set mean log market cap — the gate-proxy pick among the near-ties, not a better fit. exp() of the shrunk fitted log value is the median prediction on the log scale. TVL comes from the snapshot; age and seven-day growth are shown for each row but are not model inputs — neither helped out of sample, and neither did market-relative growth or category size. Age is the time since the protocol was first listed.' }),
       el('p', { class: 'sub', text: fitLine }),
       el('p', { class: 'sub', text: testLine }),
       el('p', { class: 'sub', text: rangeLine }),
@@ -592,9 +593,7 @@
   var dialog = el('dialog', { class: 'detail', id: 'detail', 'aria-labelledby': 'detail-title' });
   dialog.addEventListener('close', function () { state.selected = null; writeHash(); });
 
-  // The nearest priced peers: tokenized protocols the model priced without seeing them,
-  // same category first, then closest in TVL. CAP ÷ LOO model near 1.00 means the model
-  // was right about that peer; far from it, the model misses.
+  // Nearest priced peers: tokenized protocols the model priced without seeing them, same category first, then closest in TVL.
   function nearestPeers(row) {
     var lookup = DATA.loo_implied_by_slug || {};
     var cands = DATA.live.filter(function (l) { return l.mcap_usd !== null && l.mcap_usd > 0 && lookup[l.slug] !== undefined; });
@@ -615,7 +614,7 @@
     writeHash();
     dialog.textContent = '';
     var steps = farmSteps(row);
-    var multipleNote = 'The fitted line implies a market cap of ' + fmtUsd(row.implied_value_usd) + ' at this TVL: exp(' + DATA.model.intercept + ' + ' + DATA.model.slope + ' x ln(' + fmtUsd(row.tvl_usd) + ')). The effective multiple is ' + (row.implied_value_usd / row.tvl_usd).toFixed(4) + ' — it falls as TVL rises, because the slope is below 1.';
+    var multipleNote = 'The fitted line implies a market cap of ' + fmtUsd(row.implied_value_usd) + ' at this TVL: exp(' + DATA.model.mean_log_mcap + ' + ' + DATA.model.shrink + ' x (' + DATA.model.intercept + ' + ' + DATA.model.slope + ' x ln(' + fmtUsd(row.tvl_usd) + ') - ' + DATA.model.mean_log_mcap + ')) — the OLS line shrunk 10% toward the fit-set mean log market cap. The effective multiple is ' + (row.implied_value_usd / row.tvl_usd).toFixed(4) + ' — it falls as TVL rises, because the slope is below 1.';
     var share = (row.implied_value_usd / totalImplied * 100).toFixed(2) + '%';
     var peers = nearestPeers(row);
     var gas = gasTier(row);
@@ -639,10 +638,12 @@
         el('div', null, el('span', { text: 'log TVL' }), el('b', { class: 'num', text: String(row.log_tvl) })),
         el('div', null, el('span', { text: 'Intercept' }), el('b', { class: 'num', text: String(DATA.model.intercept) })),
         el('div', null, el('span', { text: 'Slope' }), el('b', { class: 'num', text: String(DATA.model.slope) })),
+        el('div', null, el('span', { text: 'Shrink toward mean log mcap' }), el('b', { class: 'num', text: String(DATA.model.shrink) })),
+        el('div', null, el('span', { text: 'Mean log market cap' }), el('b', { class: 'num', text: String(DATA.model.mean_log_mcap) })),
         el('div', null, el('span', { text: 'Fitted log market cap' }), el('b', { class: 'num', text: row.fitted_log_mcap.toFixed(4) })),
         el('div', null, el('span', { text: 'Age with no token' }), el('b', { class: 'num', text: fmtAge(row.age_days) })),
         el('div', null, el('span', { text: 'Implied value' }), el('b', { class: 'num', text: fmtUsd(row.implied_value_usd) })),
-        el('div', null, el('span', { text: 'Value range (LOO middle 50%)' }), el('b', { class: 'num', text: fmtUsd(row.value_low_usd) + '–' + fmtUsd(row.value_high_usd) })),
+        el('div', null, el('span', { text: 'Value range (category band)' }), el('b', { class: 'num', text: fmtUsd(row.value_low_usd) + '–' + fmtUsd(row.value_high_usd) })),
         el('div', null, el('span', { text: 'Token-record probability' }), el('b', { class: 'num', text: Math.round(row.issuance_probability * 100) + '%' })),
         el('div', null, el('span', { text: 'Expected value' }), el('b', { class: 'num', text: fmtUsd(row.expected_value_usd) })),
         el('div', null, el('span', { text: 'Share of the board' }), el('b', { class: 'num', text: share }))
